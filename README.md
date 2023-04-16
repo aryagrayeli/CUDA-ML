@@ -18,5 +18,6 @@ Implementing an ML language in CUDA
     - Path to test dataset (Test: path)
     - Path to where weights while be saved (Checkpoint: path)
     - Number of training epochs (Epochs: #)
+    - Batch size (Batch Size: #)
 
 CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf

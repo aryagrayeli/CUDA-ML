@@ -1,4 +1,7 @@
-float** matrix_mul(float ** a, float* b, int n, int m) {
+#include <stdlib.h>
+#include <math.h>
+
+float* matrix_mul(float ** a, float* b, int n, int m) {
   float* output = (float*) calloc(n, sizeof(float));
 
   for(int r = 0; r < n; r++)
@@ -8,26 +11,44 @@ float** matrix_mul(float ** a, float* b, int n, int m) {
   return output;
 }
 
-
-float* sigmoid(float* input, int n) {
+float* vector_sigmoid(float* input, int n) {
   float* output = (float*) malloc(sizeof(float) * n);
   
   for(int i = 0; i < n; i++)
-    output[i] = 1.0/(1+exp(-input[i]));
+    output[i] = 1.0 / (1 + exp(-input[i]));
 
   return output;
 }
 
-float* relu(float* input, int n) {
+float* vector_dsigmoid(float* input, int n) {
+  float* output = (float*) malloc(sizeof(float) * n);
+  
+  for(int i = 0; i < n; i++) {
+    float sigmoid = 1.0 / (1 + exp(-input[i]));
+    output[i] = sigmoid * (1-sigmoid);
+  }
+  return output;
+}
+
+float* vector_relu(float* input, int n) {
   float* output = (float*) malloc(sizeof(float) * n);
 
   for(int i = 0; i < n; i++)
-    output[i] = input[i] > 0 : input[i] ? 0;
+    output[i] = input[i] > 0 ? input[i] : 0;
         
   return output;
 }
 
-float* tanh(float* input, int n) {
+float* vector_drelu(float* input, int n) {
+  float* output = (float*) malloc(sizeof(float) * n);
+
+  for(int i = 0; i < n; i++)
+    output[i] = input[i] > 0;
+
+  return output;
+}
+
+float* vector_tanh(float* input, int n) {
   float* output = (float*) malloc(sizeof(float) * n);
 
   for(int i = 0; i < n; i++)
@@ -36,7 +57,18 @@ float* tanh(float* input, int n) {
   return output;
 }
 
-float* softmax(float* input, int n) {
+float* vector_dtanh(float* input, int n) {
+  float* output = (float*) malloc(sizeof(float) * n);
+
+  for(int i = 0; i < n; i++) {
+    float tanh = (exp(input[i]) - exp(-input[i])) / (exp(input[i]) + exp(-input[i]));
+    output[i] = 1 - tanh*tanh;
+  }
+
+  return output;
+}
+
+float* vector_softmax(float* input, int n) {
   float* output = (float*) malloc(sizeof(float) * n);
 
   float sum = 0;
@@ -44,6 +76,22 @@ float* softmax(float* input, int n) {
     sum += exp(input[i]);
   for(int i = 0; i < n; i++)
     output[i] = exp(input[i])/sum;
+  
+  return output;
+}
+
+float* vector_dsoftmax(float* input, int j, int n) {
+  float* output = (float*) malloc(sizeof(float) * n);
+
+  float sum = 0;
+  for(int i = 0; i < n; i++)
+    sum += exp(input[i]);
+  float sj = exp(input[j])/sum;
+  for(int i = 0; i < n; i++)
+    if(i == j)
+      output[i] = sj * (1-sj);
+    else
+      output[i] = -sj*(exp(input[i])/sum);
   
   return output;
 }
@@ -57,7 +105,7 @@ float* vector_add(float* a, float* b, int n) {
   return output;
 }
 
-float** hadamard_mul(float** a, float** b, int n, int m) {
+float** matrix_hadamard(float** a, float** b, int n, int m) {
   float** output = (float**) malloc(sizeof(float*) * n);
   for(int i = 0; i < n; i++) output[i] = malloc(sizeof(float) * m);
 

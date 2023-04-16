@@ -2,7 +2,7 @@
 Implementing an ML language in CUDA
 
 - Specify an ML language for feed forward NNs in a .arch file
-- Create a C interpreter that can run the program in CUDA on a GPU
+- Create a C interpreter that can run the program in CUDA on a GPU / Use Cuda to interpret the .arch file and execute it on a GPU
     - Both train script and test script (different inputs to each)
         - Train: 
             - Inputs: .arch file, folder of train dataset (each entry is folder w/ inputs (.in) and outputs (.out) )

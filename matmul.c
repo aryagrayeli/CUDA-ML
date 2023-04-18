@@ -137,5 +137,3 @@ float** matrix_scalar(float** input, int c, int n, int m) {
 
   return output;
 }
-
-// Derivative of Activations

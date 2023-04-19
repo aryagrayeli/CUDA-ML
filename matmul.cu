@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Batching - Input vectors are an array of vectors
+
 // Spawn N Threads
 __global__ void matrix_mul(float * a, float * b, float * output, int N, int M) {
     // int n = gridDim.x;

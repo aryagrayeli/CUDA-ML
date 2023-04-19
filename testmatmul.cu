@@ -7,7 +7,7 @@
 #include "matmul.cu"
 
 int main() {
-    int n = 3, m = 3;
+    int n = 4, m = 3;
     float *a, *b, *c;
 
     cudaMallocManaged(&a, n * m * sizeof(float));
@@ -17,7 +17,7 @@ int main() {
     // [1 -2 3]
     // [4 5 6]
     // [-7 8 9]
-    a[0] = 1; a[1] = -2; a[2] = 3; a[3] = 4; a[4] = 5; a[5] = 6; a[6] = -7; a[7] = 8; a[8] = 9;
+    a[0] = 1; a[1] = -2; a[2] = 3; a[3] = 4; a[4] = 5; a[5] = 6; a[6] = -7; a[7] = 8; a[8] = 9; a[9] = -10; a[10] = 11; a[11] = -12;
     b[0] = -1; b[1] = 2; b[2] = 3;
 
     dim3 gridSize(1, 1, 1);
@@ -26,5 +26,7 @@ int main() {
     cudaDeviceSynchronize();
 
     printf("Test Matrix Multiplication\n");
-    printf("Output: %f, %f, %f; Should be: 4, 24, 50\n\n", c[0], c[1], c[2]);
+    printf("Output: %f, %f, %f, %f; Should be: 4, 24, 50, -4\n\n", c[0], c[1], c[2], c[3]);
+
+
 }

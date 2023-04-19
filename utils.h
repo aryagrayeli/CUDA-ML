@@ -30,7 +30,7 @@ int32_t get_dataset_size(FILE * fp) {
     return *size;
 }
 
-float * get_image(FILE * fp, int image_idx) {
+double * get_image(FILE * fp, int image_idx) {
     int32_t rc[2];
     fseek(fp, 8, SEEK_SET);
     fread(rc, sizeof(int32_t), 2, fp);
@@ -40,9 +40,9 @@ float * get_image(FILE * fp, int image_idx) {
     fseek(fp, 16 + image_idx * size * sizeof(uint8_t), SEEK_SET);
     fread(pixels, sizeof(uint8_t), size, fp);
 
-    float * image = (float *) malloc(size * sizeof(float));
+    double * image = (double *) malloc(size * sizeof(double));
     for(size_t i = 0; i < size; i++)
-        image[i] = ((float)((int)pixels[i]))/255.0;
+        image[i] = ((double)((int)pixels[i]))/255.0;
     
     return image;
 }

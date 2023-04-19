@@ -9,25 +9,10 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "matmul.h"
+#include "model.h"
 
 char *program;
 char *current;
-
-typedef struct DatasetInfo {
-  char * train_files;
-  char * test_files;
-  char * checkpoint_path;
-  uint64_t epochs;
-  uint64_t batch_size;
-  char * loss_func;
-} DatasetInfo;
-
-typedef struct ArchInfo {
-  uint64_t layers;
-  uint64_t * layers_size;
-  char ** activation_function;
-} ArchInfo;
 
 
 void skip() {
@@ -176,7 +161,11 @@ int main(int argc, char **argv) {
     dataset_info.batch_size = consume_literal();
 
     consume_or_fail("Loss: ");
-    dataset_info.loss_func = consume_literal();
+    dataset_info.loss_func = consume_identifier();
 
-    // can call train(dataset_info, arch_info), test(dataset_info, arch_info), predict(dataset_info, arch_info, #)
+    printf("Loaded Arch File\n\n");
+
+    train(dataset_info, arch_info);
+    test(dataset_info, arch_info);
+    predict(dataset_info, arch_info, 1);
 }

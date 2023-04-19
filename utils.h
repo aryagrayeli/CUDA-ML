@@ -30,6 +30,14 @@ int32_t get_dataset_size(FILE * fp) {
     return *size;
 }
 
+long get_size_of_image(FILE * fp) {
+    int32_t rc[2];
+    fseek(fp, 8, SEEK_SET);
+    fread(rc, sizeof(int32_t), 2, fp);
+    long size = rc[0] * rc[1];
+    return size;
+}
+
 double * get_image(FILE * fp, int image_idx) {
     int32_t rc[2];
     fseek(fp, 8, SEEK_SET);

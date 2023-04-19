@@ -41,9 +41,9 @@ Model * initialize_model(ArchInfo * arch_info) {
         char * act_func = arch_info->activation_function[i];
 
         if(strcmp(act_func, "ReLU") == 0)
-            he_init(model->weights[i], sqrt(2.0/n)); // values sampled from G(0.0, sqrt(2/n))
+            cuda_he_init(model->weights[i], sqrt(2.0/n)); // values sampled from G(0.0, sqrt(2/n))
         else
-            xavier_init(model->weights[i], sqrt(6.0/(n+m))); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+            cuda_xavier_init(model->weights[i], sqrt(6.0/(n+m))); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
     }
 
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
@@ -52,7 +52,7 @@ Model * initialize_model(ArchInfo * arch_info) {
         model->biases[i] = (double *) malloc(sizeof(double) * m);
 
         // gpu initialize model->biases[i] in parallel
-        zero_init(model->biases[i]);
+        cuda_zero_init(model->biases[i]);
     }
 
     model->arch_info = arch_info;
@@ -69,7 +69,14 @@ Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
 }
 
 int * forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
-    // TODO
+    // load and flatten batches
+    long size = get_size_of_image(dataset);
+    double * input = (double *) malloc(sizeof(double) * size * batch_size);
+    for(int i = 0; i < batch_size; i++) {
+        double * pixels = get_image(dataset, dataloader[idx+i]);
+        memcpy(input + (i * size), pixels, sizeof(double) * size);
+    }
+
 
     int * pred_y = (int *) malloc(sizeof(int)*batch_size);
     for(int i = 0; i < batch_size; i++) {

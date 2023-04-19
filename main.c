@@ -126,8 +126,8 @@ int main(int argc, char **argv) {
 
     consume_or_fail("Layers: ");
     uint64_t layers = consume_literal();
-    uint64_t* layers_size = (uint64_t*)malloc(sizeof(uint64_t) * layers);
-    char** activation_function = (char**)malloc(sizeof(char*) * (layers-1));
+    uint64_t * layers_size = (uint64_t *) malloc(sizeof(uint64_t) * layers);
+    char ** activation_function = (char **) malloc(sizeof(char*) * (layers-1));
 
     for(int i=0;i<layers;i++) {
         layers_size[i] = consume_literal();
@@ -139,29 +139,29 @@ int main(int argc, char **argv) {
         if(i != layers-1) consume_or_fail("->");
     }
 
-    ArchInfo arch_info;
-    arch_info.layers = layers;
-    arch_info.layers_size = layers_size;
-    arch_info.activation_function = activation_function;
+    ArchInfo * arch_info = (ArchInfo *) malloc(sizeof(ArchInfo));
+    arch_info->layers = layers;
+    arch_info->layers_size = layers_size;
+    arch_info->activation_function = activation_function;
 
-    DatasetInfo dataset_info;
+    DatasetInfo * dataset_info = (DatasetInfo *) malloc(sizeof(DatasetInfo));
     consume_or_fail("Train: ");
-    dataset_info.train_files = consume_identifier();
+    dataset_info->train_files = consume_identifier();
 
     consume_or_fail("Test: ");
-    dataset_info.test_files = consume_identifier();
+    dataset_info->test_files = consume_identifier();
     
     consume_or_fail("Checkpoint: ");
-    dataset_info.checkpoint_path = consume_identifier();
+    dataset_info->checkpoint_path = consume_identifier();
 
     consume_or_fail("Epochs: ");
-    dataset_info.epochs = consume_literal();
+    dataset_info->epochs = consume_literal();
 
     consume_or_fail("Batch Size: ");
-    dataset_info.batch_size = consume_literal();
+    dataset_info->batch_size = consume_literal();
 
     consume_or_fail("Loss: ");
-    dataset_info.loss_func = consume_identifier();
+    dataset_info->loss_func = consume_identifier();
 
     printf("Loaded Arch File\n\n");
 

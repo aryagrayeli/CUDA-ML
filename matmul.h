@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdlib.h>
 #include <math.h>
 
@@ -107,7 +109,7 @@ float* vector_add(float* a, float* b, int n) {
 
 float** matrix_hadamard(float** a, float** b, int n, int m) {
   float** output = (float**) malloc(sizeof(float*) * n);
-  for(int i = 0; i < n; i++) output[i] = malloc(sizeof(float) * m);
+  for(int i = 0; i < n; i++) output[i] = (float*) malloc(sizeof(float) * m);
 
   for(int r = 0; r < n; r++)
     for(int c = 0; c < m; c++)
@@ -118,7 +120,7 @@ float** matrix_hadamard(float** a, float** b, int n, int m) {
 
 float** matrix_trans(float** input, int n, int m) {
   float** output = (float**) malloc(sizeof(float*) * m);
-  for(int i = 0; i < n; i++) output[i] = malloc(sizeof(float) * n);
+  for(int i = 0; i < n; i++) output[i] = (float*) malloc(sizeof(float) * n);
 
   for(int r = 0; r < m; r++)
     for(int c = 0; c < n; c++)
@@ -129,7 +131,7 @@ float** matrix_trans(float** input, int n, int m) {
 
 float** matrix_scalar(float** input, int c, int n, int m) {
   float** output = (float**) malloc(sizeof(float*) * n);
-  for(int i = 0; i < n; i++) output[i] = malloc(sizeof(float) * m);
+  for(int i = 0; i < n; i++) output[i] = (float*) malloc(sizeof(float) * m);
 
   for(int r = 0; r < n; r++)
     for(int c = 0; c < m; c++)

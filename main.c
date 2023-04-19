@@ -9,6 +9,9 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "matmul.h"
+#include "mnist.h"
+
 char *program;
 char *current;
 
@@ -150,6 +153,4 @@ int main(int argc, char **argv) {
 
     consume_or_fail("Batch Size: ");
     uint64_t batch_size = consume_literal();
-
-    
 }

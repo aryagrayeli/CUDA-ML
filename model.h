@@ -41,18 +41,18 @@ Model * initialize_model(ArchInfo * arch_info) {
         char * act_func = arch_info->activation_function[i];
 
         if(strcmp(act_func, "ReLU") == 0)
-            cuda_he_init(model->weights[i], sqrt(2.0/n)); // values sampled from G(0.0, sqrt(2/n))
+            cuda_he_init(model->weights[i], sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
         else
-            cuda_xavier_init(model->weights[i], sqrt(6.0/(n+m))); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+            cuda_xavier_init(model->weights[i], sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
     }
 
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     for(int i = 0; i < arch_info->layers-1; i++) {
-        uint64_t m = arch_info->layers_size[i+1];
+        int m = (int) arch_info->layers_size[i+1];
         model->biases[i] = (double *) malloc(sizeof(double) * m); // cuda malloc
 
         // gpu initialize model->biases[i] in parallel
-        cuda_zero_init(model->biases[i]);
+        cuda_zero_init(model->biases[i], m);
     }
 
     model->arch_info = arch_info;
@@ -88,7 +88,7 @@ double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int b
         double * output = (double *) malloc(sizeof(double) * next_size * batch_size); // cuda malloc
 
         int act = act_encode(arch_info->activation_function[l]);
-        batch_layer_forward(input, weights[l], biases[l], act, output, next_size, prev_size, batch_size); // cuda
+        cuda_batch_layer_forward(input, weights[l], biases[l], act, output, next_size, prev_size, batch_size); // cuda
 
         free(input); // cuda free
         input = output; // dont copy over just move pointer

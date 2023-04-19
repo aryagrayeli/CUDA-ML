@@ -10,7 +10,6 @@
 #include <string.h>
 
 #include "matmul.h"
-#include "mnist.h"
 
 char *program;
 char *current;

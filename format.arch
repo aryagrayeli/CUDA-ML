@@ -1,3 +1,4 @@
+Layers: 4
 784 -> 128 (ReLU) -> 64 (ReLU) -> 10 (Softmax)
 Train: train_data
 Test: test_data

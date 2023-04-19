@@ -1,45 +1,30 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
+
+#include "matmul.cu"
 
 int main() {
     int n = 3, m = 3;
+    float *a, *b, *c;
 
-    float** A = (float**) malloc(sizeof(float*) * n);
-    for(int i = 0; i < n; i++) A[i] = (float*) malloc(sizeof(float) * m);
+    cudaMallocManaged(&a, n * m * sizeof(float));
+    cudaMallocManaged(&b, m * sizeof(float));
+    cudaMallocManaged(&c, n * sizeof(float));
 
     // [1 -2 3]
     // [4 5 6]
     // [-7 8 9]
+    a[0] = 1; a[1] = -2; a[2] = 3; a[3] = 4; a[4] = 5; a[5] = 6; a[6] = -7; a[7] = 8; a[8] = 9;
+    b[0] = -1; b[1] = 2; b[2] = 3;
 
-    A[0][0] = 1; A[0][1] = -2; A[0][2] = 3; A[1][0] = 4; A[1][1] = 5; A[1][2] = 6; A[2][0] = -7; A[2][1] = 8; A[2][2] = 9;
-
-    float** A_cuda;
-    cudaMalloc(&A_cuda, sizeof(float*) * n);
-    for (int i = 0; i < n; i++) {
-        cudaMalloc(&A_cuda[i], sizeof(float) * m);
-        cudaMemcpy(A_cuda[i], A[i], sizeof(float) * m, cudaMemcpyHostToDevice);
-    }
-
-    float* B = (float*) malloc(sizeof(float) * n);
-
-    // [-1 2 3]
-
-    B[0] = -1; B[1] = 2; B[2] = 3;
-
-    float* B_cuda;
-    cudaMalloc(&B_cuda, sizeof(float) * n);
-    cudaMemcpy(B_cuda, B, sizeof(float) * n, cudaMemcpyHostToDevice);
-
-    float* output_cuda;
-    cudaMalloc(&output_cuda, sizeof(float) * n);
-
-    matrix_mul<<<n, m>>>(A_cuda, B_cuda, output_cuda);
-
-    float* output;
-    cudaMemcpy(output, output_cuda, sizeof(float) * n, cudaMemcpyDeviceToHost);
+    dim3 gridSize(1, 1, 1);
+    dim3 blockSize(n, m, 1);
+    matrix_mul<<<gridSize, blockSize>>>(a, b, c, n, m);
+    cudaDeviceSynchronize();
 
     printf("Test Matrix Multiplication\n");
-    printf("Output: %f, %f, %f; Should be: 4, 24, 50\n\n", output[0], output[1], output[2]);
+    printf("Output: %f, %f, %f; Should be: 4, 24, 50\n\n", c[0], c[1], c[2]);
 }

@@ -6,7 +6,7 @@
 // Batching - Input vectors are an array of vectors
 
 // Spawn N Threads
-__global__ void matrix_mul(float * a, float * b, float * output, int N, int M) {
+__global__ void matrix_mul(double * a, double * b, double * output, int N, int M) {
     // int n = gridDim.x;
     // int m = blockDim.x;
     // int r = blockIdx.x;
@@ -14,11 +14,11 @@ __global__ void matrix_mul(float * a, float * b, float * output, int N, int M) {
 
     // int Mi = 31 - __builtin_clz(m);
     // int M = 1 << Mi;
-    // __shared__ float arr[M];
-    // __shared__ float B[m];
-    // cudaMemcpy(arr, a[r], sizeof(float) * m, cudaMemcpyDeviceToDevice);
-    // cudaMemcpy(B, b, sizeof(float) * m, cudaMemcpyDeviceToDevice);
-	// cudaMemset(arr + m, 0, sizeof(float) * (M - m));
+    // __shared__ double arr[M];
+    // __shared__ double B[m];
+    // cudaMemcpy(arr, a[r], sizeof(double) * m, cudaMemcpyDeviceToDevice);
+    // cudaMemcpy(B, b, sizeof(double) * m, cudaMemcpyDeviceToDevice);
+	// cudaMemset(arr + m, 0, sizeof(double) * (M - m));
     // arr[c] *= B[c];
     // __syncthreads();
     // for (int i = 0; i < Mi; i++) {
@@ -34,7 +34,7 @@ __global__ void matrix_mul(float * a, float * b, float * output, int N, int M) {
     // output[r] = *arr; 
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     if(row < N) {
-        float sum = 0;
+        double sum = 0;
         for(int i = 0; i < M; i++) 
             sum += a[row * M + i] * b[i];
         output[row] = sum;
@@ -42,7 +42,7 @@ __global__ void matrix_mul(float * a, float * b, float * output, int N, int M) {
 }
 
 // Spawn B Threads
-__global__ void batch_matrix_mul(float * a, float * b, float * output, int N, int M, int B) {
+__global__ void batch_matrix_mul(double * a, double * b, double * output, int N, int M, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -52,14 +52,14 @@ __global__ void batch_matrix_mul(float * a, float * b, float * output, int N, in
 }
 
 // Spawn N Threads
-__global__ void vector_sigmoid(float * input, float * output, int N) {
+__global__ void vector_sigmoid(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N)
         output[i] = 1.0 / (1 + exp(-input[i]));
 }
 
 // Spawn B Threads
-__global__ void batch_vector_sigmoid(float * input, float * output, int N, int B) {
+__global__ void batch_vector_sigmoid(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -69,16 +69,16 @@ __global__ void batch_vector_sigmoid(float * input, float * output, int N, int B
 }
 
 // Spawn N Threads
-__global__ void vector_dsigmoid(float * input, float * output, int N) {
+__global__ void vector_dsigmoid(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        float sigmoid = 1.0 / (1 + exp(-input[i]));
+        double sigmoid = 1.0 / (1 + exp(-input[i]));
         output[i] = sigmoid * (1-sigmoid);
     }
 }
 
 // Spawn B Threads
-__global__ void batch_vector_dsigmoid(float * input, float * output, int N, int B) {
+__global__ void batch_vector_dsigmoid(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -88,14 +88,14 @@ __global__ void batch_vector_dsigmoid(float * input, float * output, int N, int 
 }
 
 // Spawn N Threads
-__global__ void vector_relu(float * input, float * output, int N) {
+__global__ void vector_relu(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N)
         output[i] = input[i] > 0 ? input[i] : 0;
 }
 
 // Spawn B Threads
-__global__ void batch_vector_relu(float * input, float * output, int N, int B) {
+__global__ void batch_vector_relu(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -105,14 +105,14 @@ __global__ void batch_vector_relu(float * input, float * output, int N, int B) {
 }
 
 // Spawn N Threads
-__global__ void vector_drelu(float * input, float * output, int N) {
+__global__ void vector_drelu(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N)
         output[i] = input[i] > 0;
 }
 
 // Spawn B Threads
-__global__ void batch_vector_drelu(float * input, float * output, int N, int B) {
+__global__ void batch_vector_drelu(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -122,14 +122,14 @@ __global__ void batch_vector_drelu(float * input, float * output, int N, int B) 
 }
 
 // Spawn N Threads
-__global__ void vector_tanh(float * input, float * output, int N) {
+__global__ void vector_tanh(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N)
         output[i] = (exp(input[i]) - exp(-input[i])) / (exp(input[i]) + exp(-input[i]));
 }
 
 // Spawn B Threads
-__global__ void batch_vector_tanh(float * input, float * output, int N, int B) {
+__global__ void batch_vector_tanh(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -139,16 +139,16 @@ __global__ void batch_vector_tanh(float * input, float * output, int N, int B) {
 }
 
 // Spawn N Threads
-__global__ void vector_dtanh(float * input, float * output, int N) {
+__global__ void vector_dtanh(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        float tanh = (exp(input[i]) - exp(-input[i])) / (exp(input[i]) + exp(-input[i]));
+        double tanh = (exp(input[i]) - exp(-input[i])) / (exp(input[i]) + exp(-input[i]));
         output[i] = 1 - tanh*tanh;
     }
 }
 
 // Spawn B Threads
-__global__ void batch_vector_dtanh(float * input, float * output, int N, int B) {
+__global__ void batch_vector_dtanh(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -158,10 +158,10 @@ __global__ void batch_vector_dtanh(float * input, float * output, int N, int B) 
 }
 
 // Spawn N Threads
-__global__ void vector_softmax(float * input, float * output, int N) {
+__global__ void vector_softmax(double * input, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        float sum = 0;
+        double sum = 0;
         for(int k = 0; k < N; k++)
             sum += exp(input[k]);
         output[i] = exp(input[i])/sum;
@@ -169,7 +169,7 @@ __global__ void vector_softmax(float * input, float * output, int N) {
 }
 
 // Spawn B Threads
-__global__ void batch_vector_softmax(float * input, float * output, int N, int B) {
+__global__ void batch_vector_softmax(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -179,14 +179,14 @@ __global__ void batch_vector_softmax(float * input, float * output, int N, int B
 }
 
 // Spawn N Thread
-__global__ void vector_dsoftmax(float* input, float * output, int j, int N) {
+__global__ void vector_dsoftmax(double* input, double * output, int j, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        float sum = 0;
+        double sum = 0;
         for(int k = 0; k < N; k++)
             sum += exp(input[k]);
         
-        float sj = exp(input[j])/sum;
+        double sj = exp(input[j])/sum;
         if(i == j)
             output[i] = sj * (1-sj);
         else
@@ -195,7 +195,7 @@ __global__ void vector_dsoftmax(float* input, float * output, int j, int N) {
 }
 
 // Spawn B Threads
-__global__ void batch_vector_dsoftmax(float * input, float * output, int * js, int N, int B) {
+__global__ void batch_vector_dsoftmax(double * input, double * output, int * js, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -205,14 +205,14 @@ __global__ void batch_vector_dsoftmax(float * input, float * output, int * js, i
 }
 
 // Spawn N Threads
-__global__ void vector_add(float * a, float * b, float * output, int N) {
+__global__ void vector_add(double * a, double * b, double * output, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N)
         output[i] = a[i] + b[i];
 }
 
 // Spawn B Threads
-__global__ void batch_vector_add(float * a, float * b, float * output, int N, int B) {
+__global__ void batch_vector_add(double * a, double * b, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
@@ -222,7 +222,7 @@ __global__ void batch_vector_add(float * a, float * b, float * output, int N, in
 }
 
 // Spawn N Threads
-__global__ void matrix_hadamard(float * a, float * b, float * output, int N, int M) {
+__global__ void matrix_hadamard(double * a, double * b, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M) 
@@ -230,7 +230,7 @@ __global__ void matrix_hadamard(float * a, float * b, float * output, int N, int
 }
 
 // Spawn N x M Threads
-__global__ void matrix_trans(float * input, float * output, int N, int M) {
+__global__ void matrix_trans(double * input, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M) 
@@ -238,9 +238,42 @@ __global__ void matrix_trans(float * input, float * output, int N, int M) {
 }
 
 // Spawn N x M Threads
-__global__ void matrix_scalar(float * input, int sc, float * output, int N, int M) {
+__global__ void matrix_scalar(double * input, int sc, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M) 
         output[row * M + col] = sc * input[row * M + col];
+}
+
+// Spawn N Threads
+__global__ void he_init(double * output, double range, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N) {
+        output[i] = 0;
+        for(int k = 0; k < 12; k++) 
+            output[i] += (double)rand() / (double)RAND_MAX;
+        output[i] -= 6;
+        output[i] *= range;
+    }
+}
+
+// Spawn N Threads
+__global__ void xavier_init(double * output, double range, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N) {
+        double rand01 = (double)rand() / (double)RAND_MAX;
+        output[i] = rand01 * 2*range - range;
+    }
+}
+
+// Spawn N Threads
+__global__ void zero_init(double * output, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N) {
+        output[i] = 0.0;
+    }
+}
+
+void batch_layer_forward(double * inputs) {
+
 }

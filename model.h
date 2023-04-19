@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 
 #include "utils.h"
 
@@ -21,37 +22,37 @@ typedef struct ArchInfo {
 } ArchInfo;
 
 typedef struct Model {
-    float ** weights; // list of 2D weight matrix for each layer but flattened so 1D for CUDA
-    float ** biases; // list of 1D bias vectors for each layer
+    double ** weights; // list of 2D weight matrix for each layer but flattened so 1D for CUDA
+    double ** biases; // list of 1D bias vectors for each layer
     ArchInfo * arch_info; // architecture info
 } Model;
 
 Model * initialize_model(ArchInfo * arch_info) {
     Model * model = (Model *) malloc(sizeof(Model));
 
-    model->weights = (float **) malloc(sizeof(float*) * (arch_info->layers-1));
+    model->weights = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     for(int i = 0; i < arch_info->layers-1; i++) {
-        uint64_t n = arch_info->layers_size[i];
-        uint64_t m = arch_info->layers_size[i+1];
-        model->weights[i] = (float *) malloc(sizeof(float) * n * m);
+        double n = (double) arch_info->layers_size[i];
+        double m = (double) arch_info->layers_size[i+1];
+        model->weights[i] = (double *) malloc(sizeof(double) * n * m);
 
         // gpu initialize model->weights[i] in parallel
         // different initialization depending on the activation function
         char * act_func = arch_info->activation_function[i];
 
-        // if(strcmp(act_func, "ReLU") == 0)
-        //     he_initialization = G(0.0, sqrt(2/n))
-        // else
-        //     xavier_initialization = U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+        if(strcmp(act_func, "ReLU") == 0)
+            cuda_he_init(model->weights[i], sqrt(2.0/n)); // values sampled from G(0.0, sqrt(2/n))
+        else
+            cuda_xavier_init(model->weights[i], sqrt(6.0/(n+m))); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
     }
 
-    model->biases = (float **) malloc(sizeof(float*) * (arch_info->layers-1));
+    model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     for(int i = 0; i < arch_info->layers-1; i++) {
         uint64_t m = arch_info->layers_size[i+1];
-        model->biases[i] = (float *) malloc(sizeof(float) * m);
+        model->biases[i] = (double *) malloc(sizeof(double) * m);
 
         // gpu initialize model->biases[i] in parallel
-        // initialize all to 0
+        cuda_zero_init(model->biases[i]);
     }
 
     model->arch_info = arch_info;
@@ -68,7 +69,15 @@ Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
 }
 
 int * forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
-    // TODO
+    // load and flatten batches
+    long size = get_size_of_image(dataset);
+    double * input = (double *) malloc(sizeof(double) * size * batch_size);
+    for(int i = 0; i < batch_size; i++) {
+        double * pixels = get_image(dataset, dataloader[idx+i]);
+        memcpy(input + (i * size), pixels, sizeof(double) * size);
+    }
+
+
     int * pred_y = (int *) malloc(sizeof(int)*batch_size);
     for(int i = 0; i < batch_size; i++) {
         pred_y[i] = i%10;
@@ -76,7 +85,7 @@ int * forward(Model * model, FILE * dataset, int * dataloader, int idx, int batc
     return pred_y;
 }
 
-float backward(int * pred_y, int * true_y, Model * model, char * loss_func, int batch_size) {
+double backward(int * pred_y, int * true_y, Model * model, char * loss_func, int batch_size) {
     // TODO
     return 0.1; // loss value
 }
@@ -102,11 +111,11 @@ void train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     for(int e = 0; e < dataset_info->epochs; e++) {
         shuffle(dataloader, num_images);
 
-        float running_loss = 0.0;
+        double running_loss = 0.0;
         for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
             int * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
             int * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
-            float loss = backward(pred_y, true_y, model, dataset_info->loss_func, dataset_info->batch_size);
+            double loss = backward(pred_y, true_y, model, dataset_info->loss_func, dataset_info->batch_size);
             running_loss+=loss;
         }
         printf("After Epoch %d, Train Loss: %f\n", e, running_loss);
@@ -136,7 +145,7 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     printf("Dataset and Model Initalized\n");
 
-    float accuracy = 0.0;
+    double accuracy = 0.0;
     for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
         int * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
         int * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);

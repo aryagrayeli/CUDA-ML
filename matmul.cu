@@ -85,32 +85,31 @@ __global__ void vector_dtanh(float * input, float * output, int N) {
     }
 }
 
-float* vector_softmax(float* input, int n) {
-  float* output = (float*) malloc(sizeof(float) * n);
-
-  float sum = 0;
-  for(int i = 0; i < n; i++)
-    sum += exp(input[i]);
-  for(int i = 0; i < n; i++)
-    output[i] = exp(input[i])/sum;
-  
-  return output;
+// Spawn N Threads
+__global__ void vector_softmax(float * input, float * output, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N) {
+        float sum = 0;
+        for(int k = 0; k < N; k++)
+            sum += exp(input[k]);
+        output[i] = exp(input[i])/sum;
+    }
 }
 
-float* vector_dsoftmax(float* input, int j, int n) {
-  float* output = (float*) malloc(sizeof(float) * n);
-
-  float sum = 0;
-  for(int i = 0; i < n; i++)
-    sum += exp(input[i]);
-  float sj = exp(input[j])/sum;
-  for(int i = 0; i < n; i++)
-    if(i == j)
-      output[i] = sj * (1-sj);
-    else
-      output[i] = -sj*(exp(input[i])/sum);
-  
-  return output;
+// Spawn N Thread
+__global__ void vector_dsoftmax(float* input, float * output, int j, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N) {
+        float sum = 0;
+        for(int k = 0; k < N; k++)
+            sum += exp(input[k]);
+        
+        float sj = exp(input[j])/sum;
+        if(i == j)
+            output[i] = sj * (1-sj);
+        else
+            output[i] = -sj*(exp(input[i])/sum);
+    }
 }
 
 // Spawn N Threads

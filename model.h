@@ -34,7 +34,7 @@ Model * initialize_model(ArchInfo * arch_info) {
     for(int i = 0; i < arch_info->layers-1; i++) {
         double n = (double) arch_info->layers_size[i];
         double m = (double) arch_info->layers_size[i+1];
-        model->weights[i] = (double *) malloc(sizeof(double) * n * m);
+        model->weights[i] = (double *) malloc(sizeof(double) * n * m); // cuda malloc
 
         // gpu initialize model->weights[i] in parallel
         // different initialization depending on the activation function
@@ -49,7 +49,7 @@ Model * initialize_model(ArchInfo * arch_info) {
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     for(int i = 0; i < arch_info->layers-1; i++) {
         uint64_t m = arch_info->layers_size[i+1];
-        model->biases[i] = (double *) malloc(sizeof(double) * m);
+        model->biases[i] = (double *) malloc(sizeof(double) * m); // cuda malloc
 
         // gpu initialize model->biases[i] in parallel
         cuda_zero_init(model->biases[i]);
@@ -68,24 +68,36 @@ Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
     return initialize_model(arch_info);
 }
 
-int * forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
+double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
+    double ** weights = model->weights;
+    double ** biases = model->biases;
+    ArchInfo * arch_info = model->arch_info;
+
     // load and flatten batches
-    long size = get_size_of_image(dataset);
-    double * input = (double *) malloc(sizeof(double) * size * batch_size);
+    uint64_t size = arch_info->layers_size[0];
+    double * input = (double *) malloc(sizeof(double) * size * batch_size); // cuda malloc
     for(int i = 0; i < batch_size; i++) {
         double * pixels = get_image(dataset, dataloader[idx+i]);
-        memcpy(input + (i * size), pixels, sizeof(double) * size);
+        memcpy(input + (i * size), pixels, sizeof(double) * size); // cuda mem cpy
     }
 
+    for(int l = 0; l < arch_info->layers-1; l++) {
+        int prev_size = (int) arch_info->layers_size[l];
+        int next_size = (int) arch_info->layers_size[l+1];
 
-    int * pred_y = (int *) malloc(sizeof(int)*batch_size);
-    for(int i = 0; i < batch_size; i++) {
-        pred_y[i] = i%10;
+        double * output = (double *) malloc(sizeof(double) * next_size * batch_size); // cuda malloc
+
+        int act = act_encode(arch_info->activation_function[l]);
+        batch_layer_forward(input, weights[l], biases[l], act, output, next_size, prev_size, batch_size); // cuda
+
+        free(input); // cuda free
+        input = output; // dont copy over just move pointer
     }
-    return pred_y;
+
+    return input;
 }
 
-double backward(int * pred_y, int * true_y, Model * model, char * loss_func, int batch_size) {
+double backward(double * pred_y, double * true_y, Model * model, char * loss_func, int batch_size) {
     // TODO
     return 0.1; // loss value
 }
@@ -113,8 +125,8 @@ void train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
         double running_loss = 0.0;
         for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
-            int * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
-            int * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
+            double * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
+            double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
             double loss = backward(pred_y, true_y, model, dataset_info->loss_func, dataset_info->batch_size);
             running_loss+=loss;
         }
@@ -147,11 +159,11 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     double accuracy = 0.0;
     for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
-        int * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
-        int * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
+        double * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
+        double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
         
         for(int i = 0; i < dataset_info->batch_size; i++) {
-            if(pred_y[i] == true_y[i])
+            if(arg_max(pred_y,i) == arg_max(true_y,i))
                 accuracy++;
         }
     }
@@ -176,9 +188,9 @@ void predict(DatasetInfo * dataset_info, ArchInfo * arch_info, int image_idx) {
 
     printf("Image and Model Initalized\n");
 
-    int * pred_y = forward(model, dataset, dataloader, 0, 1);
-    int * true_y = load_labels(labels, dataloader, 0, 1);
-    printf("Predicted: %d, Actual: %d\n\n", pred_y[0], true_y[0]);
+    double * pred_y = forward(model, dataset, dataloader, 0, 1);
+    double * true_y = load_labels(labels, dataloader, 0, 1);
+    printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));
 
     close_dataset(dataset);
     close_dataset(labels);

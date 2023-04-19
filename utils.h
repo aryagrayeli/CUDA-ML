@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define num_classes (10)
+
 
 char* concat(char * s1, char * s2) {
     char * result = (char *) malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
@@ -28,14 +30,6 @@ int32_t get_dataset_size(FILE * fp) {
     fseek(fp, 4, SEEK_SET);
     fread(size, sizeof(int32_t), 1, fp);
     return *size;
-}
-
-long get_size_of_image(FILE * fp) {
-    int32_t rc[2];
-    fseek(fp, 8, SEEK_SET);
-    fread(rc, sizeof(int32_t), 2, fp);
-    long size = rc[0] * rc[1];
-    return size;
 }
 
 double * get_image(FILE * fp, int image_idx) {
@@ -78,10 +72,42 @@ void shuffle(int * array, int32_t n) {
     }
 }
 
-int * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
-    int * true_y = (int *) malloc(sizeof(int)*batch_size);
+double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
+    double * true_y = (double *) malloc(sizeof(double)*num_classes*batch_size);
     for(int i = 0; i < batch_size; i++) {
-        true_y[i] = get_label(labels, dataloader[idx+i]);
+        int l = get_label(labels, dataloader[idx+i]);
+        for(int j = 0; j < num_classes; j++) {
+            if(j == l)
+                true_y[num_classes*i + j] = 1.0;
+            else
+                true_y[num_classes*i + j] = 0.0;
+        }
     }
     return true_y;
+}
+
+int act_encode(char * act) {
+    if(strcmp(act, "ReLU") == 0)
+        return 1;
+    if(strcmp(act, "sigmoid") == 0)
+        return 2;
+    if(strcmp(act, "tanh") == 0)
+        return 3;
+    if(strcmp(act, "softmax") == 0)
+        return 4;
+    return 0;
+}
+
+int arg_max(double * y, int idx) {
+    double max_val = 0.0;
+    int max_idx = 0;
+
+    for(int i = 0; i < num_classes; i++) {
+        double v = y[idx*num_classes + i];
+        if(v > max_val) {
+            max_val = v;
+            max_idx = i;
+        }
+    }
+    return max_idx;
 }

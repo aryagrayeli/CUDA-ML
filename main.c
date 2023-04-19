@@ -14,6 +14,22 @@
 char *program;
 char *current;
 
+typedef struct DatasetInfo {
+  char * train_files;
+  char * test_files;
+  char * checkpoint_path;
+  uint64_t epochs;
+  uint64_t batch_size;
+  char * loss_func;
+} DatasetInfo;
+
+typedef struct ArchInfo {
+  uint64_t layers;
+  uint64_t * layers_size;
+  char ** activation_function;
+} ArchInfo;
+
+
 void skip() {
     while (isspace(*current)) current += 1;
 }
@@ -126,30 +142,41 @@ int main(int argc, char **argv) {
     consume_or_fail("Layers: ");
     uint64_t layers = consume_literal();
     uint64_t* layers_size = (uint64_t*)malloc(sizeof(uint64_t) * layers);
-    char** normalization_function = (char**)malloc(sizeof(char*) * (layers-1));
+    char** activation_function = (char**)malloc(sizeof(char*) * (layers-1));
 
     for(int i=0;i<layers;i++) {
         layers_size[i] = consume_literal();
         if(i != 0) {
             consume_or_fail("(");
-            normalization_function[i] = consume_identifier();
+            activation_function[i] = consume_identifier();
             consume_or_fail(")");
         }
         if(i != layers-1) consume_or_fail("->");
     }
 
+    ArchInfo arch_info;
+    arch_info.layers = layers;
+    arch_info.layers_size = layers_size;
+    arch_info.activation_function = activation_function;
+
+    DatasetInfo dataset_info;
     consume_or_fail("Train: ");
-    char* train_files = consume_identifier();
+    dataset_info.train_files = consume_identifier();
 
     consume_or_fail("Test: ");
-    char* test_files = consume_identifier();
+    dataset_info.test_files = consume_identifier();
     
     consume_or_fail("Checkpoint: ");
-    char* checkpoint_path = consume_identifier();
+    dataset_info.checkpoint_path = consume_identifier();
 
     consume_or_fail("Epochs: ");
-    uint64_t epochs = consume_literal();
+    dataset_info.epochs = consume_literal();
 
     consume_or_fail("Batch Size: ");
-    uint64_t batch_size = consume_literal();
+    dataset_info.batch_size = consume_literal();
+
+    consume_or_fail("Loss: ");
+    dataset_info.loss_func = consume_literal();
+
+    // can call train(dataset_info, arch_info), test(dataset_info, arch_info), predict(dataset_info, arch_info, #)
 }

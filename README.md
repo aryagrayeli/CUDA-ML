@@ -13,11 +13,12 @@ Implementing an ML language in CUDA
 - .arch format:
     - Input layer size -> hidden layer size (hidden layer activation) -> … -> output layer size (output layer activation)
         - Activations: ReLU, sigmoid, tanh, softmax
-        - Could add convolution layers + pooling + normalization layers (too hard)
     - Path to train dataset (Train: path)
     - Path to test dataset (Test: path)
     - Path to where weights while be saved (Checkpoint: path)
     - Number of training epochs (Epochs: #)
     - Batch size (Batch Size: #)
+    - Loss function (Loss: name)
+        - Losses: MSE, Categorical Crossentropy
 
 CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf

@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 #include "matmul.h"
 
@@ -21,7 +22,7 @@ int main() {
     // [4 5 6]
     // [-7 8 9]
 
-    A[0][0] = 1; A[0][1] = 2; A[0][2] = 3; A[1][0] = 4; A[1][1] = 5; A[1][2] = 6; A[2][0] = 7; A[2][1] = 8; A[2][2] = 9;
+    A[0][0] = 1; A[0][1] = -2; A[0][2] = 3; A[1][0] = 4; A[1][1] = 5; A[1][2] = 6; A[2][0] = -7; A[2][1] = 8; A[2][2] = 9;
 
     float** B = (float**) malloc(sizeof(float*) * n);
     for(int i = 0; i < n; i++) B[i] = (float*) malloc(sizeof(float) * m);
@@ -30,7 +31,7 @@ int main() {
     // [5 -5 2]
     // [-1 8 4]
 
-    B[0][0] = 1; B[0][1] = 2; B[0][2] = 3; B[1][0] = 5; B[1][1] = 5; B[1][2] = 2; B[2][0] = 1; B[2][1] = 8; B[2][2] = 4;
+    B[0][0] = -1; B[0][1] = 2; B[0][2] = 3; B[1][0] = 5; B[1][1] = -5; B[1][2] = 2; B[2][0] = -1; B[2][1] = 8; B[2][2] = 4;
 
     float* output = matrix_mul(A, B[0], 3, 3);
     printf("Test Matrix Multiplication\n");
@@ -66,15 +67,15 @@ int main() {
 
     output = vector_dsoftmax(A[0], 0, 3);
     printf("Test softmax function derivative with j = 0\n");
-    printf("Output: %f, %f, %f; Should be: 0.041693, -0.005165, -0.014042\n\n", output[0], output[1], output[2]);
+    printf("Output: %f, %f, %f; Should be: 0.104457, −0.000699, −0.103758\n\n", output[0], output[1], output[2]);
 
     output = vector_dsoftmax(A[0], 1, 3);
     printf("Test softmax function derivative with j = 1\n");
-    printf("Output: %f, %f, %f; Should be: −0.005165, 0.104457, −0.038170\n\n", output[0], output[1], output[2]);
+    printf("Output: %f, %f, %f; Should be: −0.000699, 0.005864, −0.005165\n\n", output[0], output[1], output[2]);
 
     output = vector_dsoftmax(A[0], 2, 3);
     printf("Test softmax function derivative with j = 2\n");
-    printf("Output: %f, %f, %f; Should be: −0.014042, −0.038170, 0.218357\n\n", output[0], output[1], output[2]);
+    printf("Output: %f, %f, %f; Should be: −0.103758, −0.005165, 0.108924\n\n", output[0], output[1], output[2]);
 
     output = vector_add(A[0], B[0], 3);
     printf("Test vector addition\n");
@@ -82,7 +83,7 @@ int main() {
 
     float** output2D = matrix_hadamard(A, B, 3, 3);
     printf("Test matrix with hadamard transformation\n");
-    printf("Output: \n%f, %f, %f\n%f, %f, %f\n%f, %f, %f;\nShould be: \n-1, -4, 6\n20, -25, 12\n7, 64, 36\n\n", output2D[0][0], output2D[0][1], output2D[0][2], output2D[1][0], output2D[1][1], output2D[1][2], output2D[2][0], output2D[2][1], output2D[2][2]);
+    printf("Output: \n%f, %f, %f\n%f, %f, %f\n%f, %f, %f;\nShould be: \n-1, -4, 9\n20, -25, 12\n7, 64, 36\n\n", output2D[0][0], output2D[0][1], output2D[0][2], output2D[1][0], output2D[1][1], output2D[1][2], output2D[2][0], output2D[2][1], output2D[2][2]);
 
     output2D = matrix_trans(A, 3, 3);
     printf("Test matrix transposition\n");

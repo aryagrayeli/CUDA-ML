@@ -129,13 +129,13 @@ float** matrix_trans(float** input, int n, int m) {
   return output;
 }
 
-float** matrix_scalar(float** input, int d, int n, int m) {
+float** matrix_scalar(float** input, int sc, int n, int m) {
   float** output = (float**) malloc(sizeof(float*) * n);
   for(int i = 0; i < n; i++) output[i] = (float*) malloc(sizeof(float) * m);
 
   for(int r = 0; r < n; r++)
     for(int c = 0; c < m; c++)
-      output[r][c] = d * input[r][c];
+      output[r][c] = sc * input[r][c];
 
   return output;
 }

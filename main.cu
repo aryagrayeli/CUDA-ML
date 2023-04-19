@@ -72,7 +72,7 @@ uint64_t consume_literal() {
     return v * (negate ? -1 : 1);
   } else {
     fail();
-    return -1;
+    return 0;
   }
 }
 

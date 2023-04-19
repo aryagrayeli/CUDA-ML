@@ -2,6 +2,9 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <curand.h>
+#include <curand_kernel.h>
+
 
 // Batching - Input vectors are an array of vectors
 
@@ -246,23 +249,20 @@ __global__ void matrix_scalar(double * input, int sc, double * output, int N, in
 }
 
 // Spawn N Threads
-__global__ void he_init(double * output, double range, int N) {
+__global__ void he_init(double * output, curandState * globalState, double range, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        output[i] = 0;
-        for(int k = 0; k < 12; k++) 
-            output[i] += (double)rand() / (double)RAND_MAX;
-        output[i] -= 6;
-        output[i] *= range;
+        curandState localState = globalState[i];
+        output[i] = curand_normal(&localState) * range;
     }
 }
 
 // Spawn N Threads
-__global__ void xavier_init(double * output, double range, int N) {
+__global__ void xavier_init(double * output, curandState * globalState, double range, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        double rand01 = (double)rand() / (double)RAND_MAX;
-        output[i] = rand01 * 2*range - range;
+        curandState localState = globalState[i];
+        output[i] = curand_uniform(&localState) * 2*range - range;
     }
 }
 
@@ -272,4 +272,9 @@ __global__ void zero_init(double * output, int N) {
     if(i < N) {
         output[i] = 0.0;
     }
+}
+
+__global__ void setup_kernel(curandState * state, uint64_t seed) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    curand_init(seed, i, 0, &state[i]);
 }

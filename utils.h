@@ -8,7 +8,7 @@
 #define num_classes (10)
 
 
-char* concat(char * s1, char * s2) {
+char* concat(char * s1, const char * s2) {
     char * result = (char *) malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
     strcpy(result, s1);
     strcat(result, s2);
@@ -26,7 +26,7 @@ void close_dataset(FILE * fp) {
 }
 
 int32_t get_dataset_size(FILE * fp) {
-    int32_t * size;
+    int32_t size[1];
     fseek(fp, 4, SEEK_SET);
     fread(size, sizeof(int32_t), 1, fp);
     return *size;
@@ -53,7 +53,6 @@ int get_label(FILE * fp, int label_idx) {
     int32_t rc[2];
     fseek(fp, 8, SEEK_SET);
     fread(rc, sizeof(int32_t), 2, fp);
-    long size = rc[0] * rc[1];
 
     int label[1];
     fseek(fp, 8 + label_idx * sizeof(uint8_t), SEEK_SET);

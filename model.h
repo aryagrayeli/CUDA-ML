@@ -39,15 +39,19 @@ Model * initialize_model(ArchInfo * arch_info) {
 
         // gpu initialize model->weights[i] in parallel
         // different initialization depending on the activation function
-        char * act_func = arch_info->activation_function[i];
+        char * act_func = arch_info->activation_function[i+1];
 
         dim3 gridSz(1, 1, 1);
         dim3 blockSz(n*m, 1, 1);
 
+        curandState * state;
+        cudaMalloc(&state, n*m * sizeof(curandState));
+        setup_kernel<<<gridSz,blockSz>>>(state, time(NULL));
+
         if(strcmp(act_func, "ReLU") == 0)
-            he_init<<<gridSz, blockSz>>>(model->weights[i], sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
+            he_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
         else
-            xavier_init<<<gridSz, blockSz>>>(model->weights[i], sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+            xavier_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
     }
 
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
@@ -102,7 +106,7 @@ double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int b
         batch_matrix_mul<<<gridSz,blockSz>>>(weights[l], input, output, next_size, prev_size, batch_size);
         batch_vector_add<<<gridSz,blockSz>>>(output, biases[l], output, next_size, batch_size);
         
-        char * act = arch_info->activation_function[l];
+        char * act = arch_info->activation_function[l+1];
         if(strcmp(act, "ReLU") == 0)
             batch_vector_relu<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
         if(strcmp(act, "sigmoid") == 0)
@@ -121,6 +125,7 @@ double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int b
 
 double backward(double * pred_y, double * true_y, Model * model, char * loss_func, int batch_size) {
     // TODO
+    // copy true_y to gpu mem
     return 0.1; // loss value
 }
 
@@ -181,8 +186,11 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     double accuracy = 0.0;
     for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
-        double * pred_y = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
+        double * pred_y_gpu = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
         double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
+
+        double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
+        cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
         
         for(int i = 0; i < dataset_info->batch_size; i++) {
             if(arg_max(pred_y,i) == arg_max(true_y,i))
@@ -210,8 +218,12 @@ void predict(DatasetInfo * dataset_info, ArchInfo * arch_info, int image_idx) {
 
     printf("Image and Model Initalized\n");
 
-    double * pred_y = forward(model, dataset, dataloader, 0, 1);
+    double * pred_y_gpu = forward(model, dataset, dataloader, 0, 1);
     double * true_y = load_labels(labels, dataloader, 0, 1);
+
+    double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
+    cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
+
     printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));
 
     close_dataset(dataset);

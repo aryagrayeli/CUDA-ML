@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-float* matrix_mul(float ** a, float* b, int n, int m) {
+float* matrix_mul_norm(float ** a, float* b, int n, int m) {
   float* output = (float*) calloc(n, sizeof(float));
 
   for(int r = 0; r < n; r++)

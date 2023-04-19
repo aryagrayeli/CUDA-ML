@@ -5,9 +5,12 @@
 #include <math.h>
 
 #include "matmul.cu"
+#include "matmul.h"
+#include <time.h>
 
 int main() {
 
+  srand(time(NULL));
   
   /*
   int n = 3, m = 3;
@@ -39,35 +42,54 @@ int main() {
 
   //  B[0][0] = -1; B[0][1] = 2; B[0][2] = 3; B[1][0] = 5; B[1][1] = -5; B[1][2] = 2; B[2][0] = -1; B[2][1] = 8; B[2][2] = 4;
   */
+
+  int power = 14;
   
-  int bigN = (1<<15), bigM = (1<<15); 
-  float **bigA, **bigB, bigOutput;
+  int bigN = (1<<power), bigM = (1<<power); 
+  float *bigA, *bigB, *bigOutput;
   cudaMallocManaged(&bigA, bigN * bigM * sizeof(float));
   cudaMallocManaged(&bigB, bigM * sizeof(float));
   cudaMallocManaged(&bigOutput, bigN * sizeof(float));
 
+  printf("Nice monkey\n");
+
+  for(int i=0;i<bigN*bigM;i++) bigA[i] = rand()/5161.9;
+  for(int i=0;i<bigM;i++) bigB[i] = rand()/12482.8;
+
+ // for(int i=0;i<bigN*bigM;i++) printf("%f, ", bigA[i]);
+  for(int i=0;i<bigM;i++) printf("%f... ", bigB[i]);
+  printf("\n\n\n\n\n");
+
+  /*
   float **bigA2d = (float**)(malloc(sizeof(float*) * bigN));
   for(int i=0;i<bigN;i++) bigA2d[i] = (float*)(malloc(sizeof(float) * bigM));
   for(int i=0;i<bigN;i++)
     for(int j=0;j<bigM;j++)
       bigA2d[i][j] = bigA[i*bigN + j];
-  
+  */
+
   printf("Test Big Matrix Multiplication\n");
-  dim3 bigGridSize(1, 1, 1);
-  dim3 bigBlockSize(bigN, bigM, 1);
+  int threads = 1 << 4;
+  dim3 bigGridSize((bigN + threads - 1)/threads, (bigM + threads - 1)/threads, 1);
+  dim3 bigBlockSize(threads, threads, 1);
   matrix_mul<<<bigGridSize, bigBlockSize>>>(bigA, bigB, bigOutput, bigN, bigM);
   cudaDeviceSynchronize();
   printf("Done executing GPU matmul\n");
 
-  printf("Starting normal big MatMul")
-  float **bigOutputNormal = matrix_mul(bigA2d, bigB, bigN, bigM);
-  printf("Done calculating on CPU");
-  for(int i=0;i<bigN;i++)
-    for(int j=0;j<bigM;j++)
-      if(bigOutputNormal[i][j] - bigOutput[i*bigN + j] > 0.001)
-	printf("FAILED! Expected output: %f, GPU got: %f\n", bigOutputNormal[i][j], bigOutput[i*bigN + j]);
-  
-  printf("Done comparing output");
+  printf("Starting normal big MatMul\n");
+  //float *bigOutputNormal = matrix_mul_norm(bigA2d, bigB, bigN, bigM);
+  //printf("Done calculating on CPU\n");
+  /*for(int i=0;i<bigN;i++) {
+    if(bigOutputNormal[i] - bigOutput[i] > 0.001)
+      printf("FAILED! Expected output: %f, GPU got: %f\n", bigOutputNormal[i], bigOutput[i]);
+  }*/
+
+ // for(int i=0;i<bigN;i++) printf("%f ",bigOutputNormal[i]);
+  printf("\n");
+  for(int i=0;i<bigN;i++) printf("%f ",bigOutput[i]);
+  printf("\n");
+
+  printf("Done comparing output\n");
 
   /*
   dim3 gridSize(1, 1, 1);

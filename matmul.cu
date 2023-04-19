@@ -10,10 +10,26 @@ __global__ void matrix_mul(float ** a, float * b, float * output) {
     int r = blockIdx.x;
     int c = threadIdx.x;
 
-    __shared__ int arr[m];
-	arr[c] = a[r][c] * b[c];
+    int Mi = 31 - __builtin_clz(m);
+    int M = 1 << Mi;
+    __shared__ float arr[M];
+    __shared__ float B[m];
+    cudaMemcpy(arr, a[r], sizeof(float) * m, cudaMemcpyDeviceToDevice);
+    cudaMemcpy(B, b, sizeof(float) * m, cudaMemcpyDeviceToDevice);
+	cudaMemset(arr + m, 0, sizeof(float) * (M - m));
+    arr[c] *= B[c];
     __syncthreads();
-    for(int i = 0; i < m; i++)
+    for (int i = 0; i < Mi; i++) {
+        if (c >> (Mi - i - 1)) {
+            continue;
+        }
+        int a = c << (i + 1);
+        int b = a + (1 << i);
+        arr[a] += arr[b]
+        __syncthreads();
+    }
+
+    output[r] = *arr; 
 }
 
 // Spawn 1 x N Threads
@@ -103,8 +119,8 @@ __global__ void matrix_trans(float ** input, float ** output) {
 }
 
 // Spawn N x M Threads
-__global__ void matrix_scalar(float ** input, int c, float ** output) {
+__global__ void matrix_scalar(float ** input, int sc, float ** output) {
     int r = blockIdx.x;
     int c = threadIdx.x;
-    output[r][c] = c * input[r][c];
+    output[r][c] = sc * input[r][c];
 }

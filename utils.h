@@ -86,18 +86,6 @@ double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
     return true_y;
 }
 
-int act_encode(char * act) {
-    if(strcmp(act, "ReLU") == 0)
-        return 1;
-    if(strcmp(act, "sigmoid") == 0)
-        return 2;
-    if(strcmp(act, "tanh") == 0)
-        return 3;
-    if(strcmp(act, "softmax") == 0)
-        return 4;
-    return 0;
-}
-
 int arg_max(double * y, int idx) {
     double max_val = 0.0;
     int max_idx = 0;

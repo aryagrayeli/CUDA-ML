@@ -273,7 +273,3 @@ __global__ void zero_init(double * output, int N) {
         output[i] = 0.0;
     }
 }
-
-void batch_layer_forward(double * inputs) {
-
-}

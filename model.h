@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "utils.h"
+#include "matmul.cu"
 
 typedef struct DatasetInfo {
   char * train_files;
@@ -34,25 +35,31 @@ Model * initialize_model(ArchInfo * arch_info) {
     for(int i = 0; i < arch_info->layers-1; i++) {
         double n = (double) arch_info->layers_size[i];
         double m = (double) arch_info->layers_size[i+1];
-        model->weights[i] = (double *) malloc(sizeof(double) * n * m); // cuda malloc
+        cudaMalloc(&(model->weights[i]), sizeof(double) * n * m);
 
         // gpu initialize model->weights[i] in parallel
         // different initialization depending on the activation function
         char * act_func = arch_info->activation_function[i];
 
+        dim3 gridSz(1, 1, 1);
+        dim3 blockSz(n*m, 1, 1);
+
         if(strcmp(act_func, "ReLU") == 0)
-            cuda_he_init(model->weights[i], sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
+            he_init<<<gridSz, blockSz>>>(model->weights[i], sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
         else
-            cuda_xavier_init(model->weights[i], sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+            xavier_init<<<gridSz, blockSz>>>(model->weights[i], sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
     }
 
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     for(int i = 0; i < arch_info->layers-1; i++) {
         int m = (int) arch_info->layers_size[i+1];
-        model->biases[i] = (double *) malloc(sizeof(double) * m); // cuda malloc
+        cudaMalloc(&(model->biases[i]), sizeof(double) * m);
+
+        dim3 gridSz(1, 1, 1);
+        dim3 blockSz(m, 1, 1);
 
         // gpu initialize model->biases[i] in parallel
-        cuda_zero_init(model->biases[i], m);
+        zero_init<<<gridSz, blockSz>>>(model->biases[i], m);
     }
 
     model->arch_info = arch_info;
@@ -75,22 +82,37 @@ double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int b
 
     // load and flatten batches
     uint64_t size = arch_info->layers_size[0];
-    double * input = (double *) malloc(sizeof(double) * size * batch_size); // cuda malloc
+    double * input;
+    cudaMalloc(&input, sizeof(double) * size * batch_size);
     for(int i = 0; i < batch_size; i++) {
         double * pixels = get_image(dataset, dataloader[idx+i]);
-        memcpy(input + (i * size), pixels, sizeof(double) * size); // cuda mem cpy
+        cudaMemcpy(input + (i * size), pixels, sizeof(double) * size, cudaMemcpyHostToDevice);
     }
 
     for(int l = 0; l < arch_info->layers-1; l++) {
         int prev_size = (int) arch_info->layers_size[l];
         int next_size = (int) arch_info->layers_size[l+1];
 
-        double * output = (double *) malloc(sizeof(double) * next_size * batch_size); // cuda malloc
+        double * output;
+        cudaMalloc(&output, sizeof(double) * next_size * batch_size);
 
-        int act = act_encode(arch_info->activation_function[l]);
-        cuda_batch_layer_forward(input, weights[l], biases[l], act, output, next_size, prev_size, batch_size); // cuda
+        dim3 gridSz(1,1,1);
+        dim3 blockSz(batch_size,1,1);
 
-        free(input); // cuda free
+        batch_matrix_mul<<<gridSz,blockSz>>>(weights[l], input, output, next_size, prev_size, batch_size);
+        batch_vector_add<<<gridSz,blockSz>>>(output, biases[l], output, next_size, batch_size);
+        
+        char * act = arch_info->activation_function[l];
+        if(strcmp(act, "ReLU") == 0)
+            batch_vector_relu<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
+        if(strcmp(act, "sigmoid") == 0)
+            batch_vector_sigmoid<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
+        if(strcmp(act, "tanh") == 0)
+            batch_vector_tanh<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
+        if(strcmp(act, "softmax") == 0)
+            batch_vector_softmax<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
+
+        cudaFree(input);
         input = output; // dont copy over just move pointer
     }
 

@@ -189,6 +189,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     for(int i = 0; i < num_layers-1; i++) {
         double * gradients;
         cudaMalloc(&gradients, sizeof(double) * layers_size[i+1] * layers_size[i]);
+        zero_init<<<>>>(gradients, layers_size[i+1] * layers_size[i]);
 
         batch_vector_op<<<>>>(layer_delts[i], layer_vecs[i], gradients, layer_sizes[i+1], layer_sizes[i], batch_size);
         matrix_sub_scalar<<<>>>(weights[i], gradients, (double) ALPHA, weights[i], layer_sizes[i+1], layer_size[i]);

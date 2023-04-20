@@ -81,6 +81,7 @@ void save_model(Model * model, char * checkpoint_path) {
 
     cudaDeviceSynchronize();
 
+    fprintf(fp, "Biases:\n");
     for(int i=0;i<model->arch_info->layers-1;i++) {
         uint64_t N = model->arch_info->layers_size[i+1];
 
@@ -92,6 +93,7 @@ void save_model(Model * model, char * checkpoint_path) {
         fprintf(fp, "\n");
     }
 
+    fprintf(fp, "Weights:\n");
     for(int i=0;i<model->arch_info->layers-1;i++) {
         uint64_t N = model->arch_info->layers_size[i+1];
         uint64_t M = model->arch_info->layers_size[i];
@@ -119,25 +121,29 @@ Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
     model->weights = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
 
+    fscanf(fp, "Biases:\n");
     for(int i=0;i<arch_info->layers-1;i++) {
         uint64_t N = arch_info->layers_size[i+1];
 
         double * bias = (double *) malloc(sizeof(double) * N);
         for(int j = 0; j < N; j++)
-            fscanf(fp, " %lf", &(bias[j]));
+            fscanf(fp, "%lf ", &(bias[j]));
+        fscanf(fp,"\n");
 
         cudaMalloc(&(model->biases[i]), sizeof(double) * N);
         cudaMemcpy(model->biases[i], bias, sizeof(double) * N, cudaMemcpyHostToDevice);
     }
 
+    fscanf(fp, "Weights:\n");
     for(int i=0;i<arch_info->layers-1;i++) {
         uint64_t N = arch_info->layers_size[i+1];
         uint64_t M = arch_info->layers_size[i];
 
         double * weight = (double *) malloc(sizeof(double) * N * M);
         for(int j = 0; j < N*M; j++)
-            fscanf(fp, " %lf", &(weight[j]));
-
+            fscanf(fp, "%lf ", &(weight[j]));
+        fscanf(fp,"\n");
+        
         cudaMalloc(&(model->weights[i]), sizeof(double) * N * M);
         cudaMemcpy(model->weights[i], weight, sizeof(double) * N * M, cudaMemcpyHostToDevice);
     }
@@ -304,7 +310,7 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     FILE * dataset = load_dataset(concat(dataset_info->train_files,"/train-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->train_files,"/train-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
-    num_images = 16;
+    num_images = 256;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -345,7 +351,7 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
-    num_images = 128;
+    num_images = 256;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -400,10 +406,16 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
     double ** layer_vecs = forward(model, dataset, dataloader, 0, 1);
     double * true_y = load_labels(labels, dataloader, 0, 1);
 
-    double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
+    double * pred_y = (double *) malloc(sizeof(double) * num_classes * 1);
     cudaDeviceSynchronize();
-    cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * 1, cudaMemcpyDeviceToHost);
 
+    printf("Output Vector: ");
+    for(int i = 0; i < num_classes; i++) {
+        printf("%lf ", pred_y[i]);
+    }
+    printf("\n");
+ 
     printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));
 
     // free

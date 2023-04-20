@@ -248,7 +248,7 @@ __global__ void matrix_trans(double * input, double * output, int N, int M) {
 }
 
 // Spawn N x M Threads
-__global__ void matrix_scalar(double * input, int sc, double * output, int N, int M) {
+__global__ void matrix_scalar(double * input, double sc, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M) 
@@ -291,4 +291,43 @@ __global__ void vector_hadamard(double * a, double * b, double * output, int N) 
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < N)
         output[i] = a[i] * b[i];
+}
+
+// Spawn N x M Threads
+__global__ matrix_sub_scalar(double * a, double * b, double sc, double * output, int N, int M) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    if(row < N && col < M)
+        output[row * M + col] = a[row * M + col] - sc * b[row * M + col];
+}
+
+// Spawn N Threads
+__global__ vector_sub_scalar(double * a, double * b, double sc, double * output, int N) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < N)
+        output[i] = a[i] - sc * b[i];
+}
+
+// Spawn N x M Threads
+__global__ void vector_op(double * a, double * b, double * output, int N, int M, int B) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    int col = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(row < N && col < M)
+        for(int i = 0; i < B; i++)
+            output[row * M + col] += a[i * N + row] * b[i * M + col];
+}
+
+// Spawn B Threads
+__global__ void mse_loss(double * a, double * b, double * output, int N, int B) {
+    int batch = threadIdx.x + blockIdx.x * blockDim.x;
+    if(batch < B) {
+        double sum = 0;
+        for(int i = 0; i < N; i++) {
+            double diff = a[batch * N + i] - b[batch * N + i];
+            sum += diff * diff;
+        }
+
+        output[batch] = sum / N;
+    }
 }

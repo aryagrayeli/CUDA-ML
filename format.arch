@@ -1,5 +1,5 @@
 Layers: 4
-784 -> 128 (ReLU) -> 64 (ReLU) -> 10 (Softmax)
+784 -> 128 (sigmoid) -> 64 (sigmoid) -> 10 (sigmoid)
 Train: train_data
 Test: test_data
 Checkpoint: weights.pth

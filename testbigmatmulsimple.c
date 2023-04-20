@@ -17,7 +17,7 @@ int main() {
   srand(time(NULL));
   
   int power = 15;
-  int bigN = (1<<power), bigM = (1<<14);
+  int bigN = (1<<power), bigM = (1<<15);
   
   float** bigA = (float**)(malloc(sizeof(float*) * bigN));
   for(int i=0;i<bigN;i++)
@@ -38,7 +38,12 @@ int main() {
 
   printf("successfully initialized\n");
   
+  struct timeval stop, start;
+  gettimeofday(&start, NULL);
   float* output = matrix_mul(bigA, bigB, bigN, bigM);
+  gettimeofday(&stop, NULL);
 
   for(int i=0;i<bigN;i++)  printf("%f\n", output[i]);
+
+  printf("took %lu us\n", (stop.tv_sec - start.tv_sec) * 1000000 + stop.tv_usec - start.tv_usec); 
 }

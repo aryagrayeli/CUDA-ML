@@ -19,6 +19,6 @@ Implementing an ML language in CUDA
     - Number of training epochs (Epochs: #)
     - Batch size (Batch Size: #)
     - Loss function (Loss: name)
-        - Losses: MSE, Categorical Crossentropy
+        - Losses: MSE
 
 CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf

@@ -229,7 +229,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     }
     else // invalid, only MSE loss supported currently
         return -1.0;
-
+    
     double ** layer_delts = (double **) malloc(sizeof(double*) * (num_layers-1));
 
     for(int i = num_layers-2; i >= 0; i--) {
@@ -244,14 +244,22 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         } 
         else {
             double * weight_transpose;
-            cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+1] * layers_size[i]);
-            dim3 gridSz2((layers_size[i+1] + THREADS - 1)/THREADS, (layers_size[i] + THREADS - 1)/THREADS, 1);
+            cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+2] * layers_size[i+1]);
+            dim3 gridSz2((layers_size[i+2] + THREADS - 1)/THREADS, (layers_size[i+1] + THREADS - 1)/THREADS, 1);
             dim3 blockSz2(THREADS, THREADS);
-            matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layers_size[i+1], layers_size[i]);
+            matrix_trans<<<gridSz2, blockSz2>>>(weights[i+1], weight_transpose, layers_size[i+2], layers_size[i+1]);
 
+            batch_matrix_mul<<<1, batch_size>>>(weight_transpose, layer_delts[i+1], delta, layers_size[i+1], layers_size[i+2], batch_size);
             cudaFree(weight_transpose);
-            batch_matrix_mul<<<1, batch_size>>>(weights[i+1], layer_delts[i], delta, layers_size[i], layers_size[i+1], batch_size);
         }
+
+        // double * delta_cpu = (double *) malloc(sizeof(double) * layers_size[i+1] * batch_size);
+        // cudaDeviceSynchronize();
+        // cudaMemcpy(delta_cpu, delta, sizeof(double) * layers_size[i+1] * batch_size, cudaMemcpyDeviceToHost);
+        // for(int j = 0; j < layers_size[i+1] * batch_size; j++)
+        //     printf("%lf ", delta_cpu[j]);
+        // printf("\n\n");
+
 
         double * d_act;
         cudaMalloc(&d_act, sizeof(double) * layers_size[i+1] * batch_size);
@@ -317,7 +325,6 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     FILE * dataset = load_dataset(concat(dataset_info->train_files,"/train-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->train_files,"/train-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
-    num_images = 256;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -358,7 +365,6 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
-    num_images = 256;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {

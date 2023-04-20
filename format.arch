@@ -3,6 +3,6 @@ Layers: 4
 Train: train_data
 Test: test_data
 Checkpoint: weights.pth
-Epochs: 10
-Batch Size: 32
+Epochs: 1
+Batch Size: 128
 Loss: MSE

@@ -22,5 +22,5 @@ Implementing an ML language in CUDA
         - Losses: MSE
 
 How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
-How to run: ./run.exe format.arch
+How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
 CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf

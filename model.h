@@ -11,6 +11,8 @@
 #define THREADS (32)
 #define NUM_TRAIN (60000)
 #define NUM_TEST (10000)
+#define IM_WIDTH (28)
+#define IM_HEIGHT (28)
 
 typedef struct DatasetInfo {
   char * train_files;
@@ -425,6 +427,20 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
     double * pred_y = (double *) malloc(sizeof(double) * num_classes * 1);
     cudaDeviceSynchronize();
     cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * 1, cudaMemcpyDeviceToHost);
+
+    double * image = get_image(dataset, image_idx);
+
+    printf("Displaying Image #%d:\n", image_idx);
+    for(int i = 0; i < IM_WIDTH; i++) {
+        for(int j = 0; j < IM_HEIGHT; j++) {
+            if(image[IM_HEIGHT*i+j] > 0.01)
+                printf(". ");
+            else
+                printf("  ");
+        }
+        printf("\n");
+    }
+    printf("\n");
 
     printf("Output Vector: ");
     for(int i = 0; i < num_classes; i++) {

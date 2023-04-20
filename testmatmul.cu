@@ -8,15 +8,15 @@
 
 int main() {
   int n = 3, m = 3;
-  float *A, *B, *output, *output2d;
+  double *A, *B, *output, *output2d;
   
-  cudaMallocManaged(&A, n * m * sizeof(float));
-  cudaMallocManaged(&B, m * sizeof(float));
-  cudaMallocManaged(&output, n * sizeof(float));
+  cudaMallocManaged(&A, n * m * sizeof(double));
+  cudaMallocManaged(&B, m * sizeof(double));
+  cudaMallocManaged(&output, n * sizeof(double));
   cudaMallocManaged(&output2d, n*m);
   
-  //  float** A = (float**) malloc(sizeof(float*) * n);
-  //for(int i = 0; i < n; i++) A[i] = (float*) malloc(sizeof(float) * m);
+  //  double** A = (double**) malloc(sizeof(double*) * n);
+  //for(int i = 0; i < n; i++) A[i] = (double*) malloc(sizeof(double) * m);
 
   // [1 -2 3]
   // [4 5 6]
@@ -26,8 +26,8 @@ int main() {
   A[0] = 1; A[1] = -2; A[2] = 3; A[3] = 4; A[4] = 5; A[5] = 6; A[6] = -7; A[7] = 8; A[8] = 9;
   B[0] = -1; B[1] = 2; B[2] = 3; B[3] = 5; B[4] = -5; B[5] = 2; B[6] = -1; B[7] = 8; B[8] = 4;
   
-  //float** B = (float**) malloc(sizeof(float*) * n);
-  //for(int i = 0; i < n; i++) B[i] = (float*) malloc(sizeof(float) * m);
+  //double** B = (double**) malloc(sizeof(double*) * n);
+  //for(int i = 0; i < n; i++) B[i] = (double*) malloc(sizeof(double) * m);
 
   // [-1 2 3]
   // [5 -5 2]
@@ -105,7 +105,7 @@ int main() {
   printf("Test vector addition\n");
   printf("Output: %f, %f, %f; Should be: 0, 0, 6\n\n", output[0], output[1], output[2]);
   
-  //float** output2D = matrix_hadamard(A, B, 3, 3);
+  //double** output2D = matrix_hadamard(A, B, 3, 3);
 
   matrix_hadamard<<<gridSize, blockSize>>>(A, B, output2d, 3, 3);
   cudaDeviceSynchronize();

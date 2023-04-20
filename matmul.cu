@@ -1,12 +1,12 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <cuda.h>
 
-
-// Batching - Input vectors are an array of vectors
 
 // Spawn N Threads
 __global__ void matrix_mul(double * a, double * b, double * output, int N, int M) {
@@ -49,7 +49,7 @@ __global__ void batch_matrix_mul(double * a, double * b, double * output, int N,
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
         dim3 gridSz(1, 1, 1);
-        dim3 blockSz(N, M, 1);
+        dim3 blockSz(N, 1, 1);
         matrix_mul<<<gridSz, blockSz>>>(a, b + (batch * M), output + (batch * N), N, M);
     }
 }
@@ -221,6 +221,23 @@ __global__ void batch_vector_add(double * a, double * b, double * output, int N,
         dim3 gridSz(1, 1, 1);
         dim3 blockSz(N, 1, 1);
         vector_add<<<gridSz, blockSz>>>(a + (batch * N), b, output + (batch * N), N);
+    }
+}
+
+// Spawn N Threads
+__global__ void vector_sub(double * a, double * b, double * output, int N) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i < N)
+        output[i] = a[i] - b[i];
+}
+
+// Spawn B Threads
+__global__ void batch_vector_sub(double * a, double * b, double * output, int N, int B) {
+    int batch = blockIdx.x * blockDim.x + threadIdx.x;
+    if(batch < B) {
+        dim3 gridSz(1, 1, 1);
+        dim3 blockSz(N, 1, 1);
+        vector_sub<<<gridSz, blockSz>>>(a + (batch * N), b, output + (batch * N), N);
     }
 }
 

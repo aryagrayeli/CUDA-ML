@@ -245,8 +245,8 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         else {
             double * weight_transpose;
             cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+1] * layers_size[i]);
-            dim3 gridSz(1, 1, 1);
-            dim3 blockSz(layers_size[i+1], layers_size[i], 1);
+            dim3 gridSz2((layers_size[i+1] + THREADS - 1)/THREADS, (layers_size[i] + THREADS - 1)/THREADS, 1);
+            dim3 blockSz2(THREADS, THREADS);
             matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layers_size[i+1], layers_size[i]);
 
             cudaFree(weight_transpose);

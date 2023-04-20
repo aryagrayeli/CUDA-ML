@@ -2,7 +2,7 @@ Layers: 4
 784 -> 128 (sigmoid) -> 64 (sigmoid) -> 10 (sigmoid)
 Train: train_data
 Test: test_data
-Checkpoint: weights.pth
-Epochs: 1
+Checkpoint: weights100.pth
+Epochs: 100
 Batch Size: 128
 Loss: MSE

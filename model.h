@@ -9,6 +9,8 @@
 
 #define ALPHA (0.05)
 #define THREADS (32)
+#define NUM_TRAIN (60000)
+#define NUM_TEST (10000)
 
 typedef struct DatasetInfo {
   char * train_files;
@@ -324,7 +326,7 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     FILE * dataset = load_dataset(concat(dataset_info->train_files,"/train-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->train_files,"/train-labels.idx1-ubyte"));
-    int32_t num_images = get_dataset_size(dataset);
+    int32_t num_images = NUM_TRAIN;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -345,6 +347,7 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
             double loss = backward(layer_vecs, true_y, model, dataset_info->loss_func, dataset_info->batch_size);
             running_loss+=loss;
         }
+        running_loss /= num_images;
         printf("After Epoch %d, Train Loss: %f\n", e, running_loss);
     }
 
@@ -364,7 +367,7 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
-    int32_t num_images = get_dataset_size(dataset);
+    int32_t num_images = NUM_TEST;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {

@@ -18,7 +18,7 @@ char* concat(char * s1, const char * s2) {
 FILE * load_dataset(char * filename) {
     FILE * fp;
     fp = fopen(filename, "rb");
-    free(filename);
+    // free(filename);
     return fp;
 }
 
@@ -26,18 +26,13 @@ void close_dataset(FILE * fp) {
     fclose(fp);
 }
 
-int32_t get_dataset_size(FILE * fp) {
-    int32_t size[1];
-    fseek(fp, 4, SEEK_SET);
-    fread(size, sizeof(int32_t), 1, fp);
-    return *size;
-}
-
 double * get_image(FILE * fp, int image_idx) {
-    int32_t rc[2];
+    int8_t * rc = (int8_t *) malloc(sizeof(int8_t) * 8);
     fseek(fp, 8, SEEK_SET);
-    fread(rc, sizeof(int32_t), 2, fp);
-    long size = rc[0] * rc[1];
+    fread(rc, sizeof(int8_t), 8, fp);
+    uint32_t dim1 = ((uint32_t) rc[0] << 24) | ((uint32_t) rc[1] << 16) | ((uint32_t) rc[2] << 8) | ((uint32_t) rc[3]);
+    uint32_t dim2 = ((uint32_t) rc[4] << 24) | ((uint32_t) rc[5] << 16) | ((uint32_t) rc[6] << 8) | ((uint32_t) rc[7]);
+    uint32_t size = dim1 * dim2;
 
     uint8_t pixels[size];
     fseek(fp, 16 + image_idx * size * sizeof(uint8_t), SEEK_SET);
@@ -51,10 +46,6 @@ double * get_image(FILE * fp, int image_idx) {
 }
 
 uint8_t get_label(FILE * fp, int label_idx) {
-    int32_t rc[2];
-    fseek(fp, 8, SEEK_SET);
-    fread(rc, sizeof(int32_t), 2, fp);
-
     uint8_t label[1];
     fseek(fp, 8 + label_idx * sizeof(uint8_t), SEEK_SET);
     fread(label, sizeof(uint8_t), 1, fp);

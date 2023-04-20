@@ -73,7 +73,70 @@ Model * initialize_model(ArchInfo * arch_info) {
     return model;
 }
 
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+typedef struct ArchInfo {
+  uint64_t layers;
+  uint64_t * layers_size;
+  char ** activation_function;
+} ArchInfo;
+
+typedef struct Model {
+    double ** weights; // list of 2D weight matrix for each layer but flattened so 1D for CUDA
+    double ** biases; // list of 1D bias vectors for each layer
+    ArchInfo * arch_info; // architecture info
+} Model;
+
+
 void save_model(Model * model, char * checkpoint_path) {
+  FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
+  
+  for(int i=0;i<model->arch_info->layers-1;i++) {
+    for(int j=0;j<model->arch_info->layers_size[i+1];j++)
+      fprintf(fp, "%lf ", model->biases[i][j]);
+    fprintf(fp, "\n");
+  }
+
+  for(int i=0;i<model->arch_info->layers-1;i++) {
+    for(int j=0;j<(model->arch_info->layers_size[i] * model->arch_info->layers_size[i+1]);j++)
+      fprintf(fp, "%lf ", model->weights[i][j]);
+    fprintf(fp, "\n");
+  }
+
+  fclose(fp);
+  
+}
+
+Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
+
+  FILE* fp = fopen(checkpoint_path, "r");
+
+  // should this be on GPU memory? Can change easily
+  Model* loaded_model = (Model*)malloc(sizeof(Model));
+  loaded_model->biases = (double**)(malloc(sizeof(double*) * (arch_info->layers-1)));
+  
+  for(int i=0;i<arch_info->layers-1;i++) {
+    loaded_model->biases[i] = (double*)(malloc(sizeof(double) * arch_info->layers_size[i+1]));
+    for(int j=0;j<arch_info->layers_size[i+1];j++)
+      fscanf(fp, " %lf", &loaded_model->biases[i][j]);
+  }
+
+  for(int i=0;i<arch_info->layers-1;i++) {
+    loaded_model->weights[i] = (double*)(malloc(sizeof(double) * arch_info->layers_size[i] * arch_info->layers_size[i+1]));
+    for(int j=0;j<(arch_info->layers_size[i] * arch_info->layers_size[i+1]);j++)
+      fscanf(fp, " %lf", &loaded_model->weights[i][j]);
+  }
+
+  fclose(fp);
+  return loaded_model;
+}
+
+
+
+void __save_model(Model * model, char * checkpoint_path) {
     FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
     fprintf(fp, "Model:\n");
     fprintf(fp, "Layers: %ld\n", model -> arch_info -> layers);
@@ -109,16 +172,6 @@ void save_model(Model * model, char * checkpoint_path) {
     }
 
     fclose(fp);
-}
-
-Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
-    // TODO
-    FILE* fp = fopen(checkpoint_path, "r");
-
-    // arch_info
-
-    fclose(fp);
-    return initialize_model(arch_info);
 }
 
 double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {

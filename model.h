@@ -49,12 +49,13 @@ Model * initialize_model(ArchInfo * arch_info) {
         curandState * state;
         cudaMalloc(&state, n*m * sizeof(curandState));
         setup_kernel<<<gridSz,blockSz>>>(state, time(NULL));
-        
 
         if(strcmp(act_func, "ReLU") == 0)
             he_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
         else
             xavier_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+
+        cudaFree(state);
     }
 
     model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
@@ -151,6 +152,7 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
     for(int i = 0; i < batch_size; i++) {
         double * pixels = get_image(dataset, dataloader[idx+i]);
         cudaMemcpy(input + (i * size), pixels, sizeof(double) * size, cudaMemcpyHostToDevice);
+        free(pixels);
     }
 
     double ** layer_vecs = (double **) malloc(sizeof(double*) * arch_info->layers);

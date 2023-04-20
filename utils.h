@@ -18,6 +18,7 @@ char* concat(char * s1, const char * s2) {
 FILE * load_dataset(char * filename) {
     FILE * fp;
     fp = fopen(filename, "rb");
+    free(filename);
     return fp;
 }
 

@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     consume_or_fail("Layers: ");
     uint64_t layers = consume_literal();
     uint64_t * layers_size = (uint64_t *) malloc(sizeof(uint64_t) * layers);
-    char ** activation_function = (char **) malloc(sizeof(char*) * (layers-1));
+    char ** activation_function = (char **) malloc(sizeof(char*) * layers);
 
     for(int i=0;i<layers;i++) {
         layers_size[i] = consume_literal();
@@ -171,4 +171,23 @@ int main(int argc, char **argv) {
     predict(model, dataset_info, arch_info, 1);
 
     // free everything in model, dataset_info and arch_info
+    free(dataset_info->train_files);
+    free(dataset_info->test_files);
+    free(dataset_info->checkpoint_path);
+    free(dataset_info->loss_func);
+    free(dataset_info);
+
+    for(int i = 0; i < arch_info->layers; i++)
+      free(arch_info->activation_function[i]);
+    free(arch_info->activation_function);
+    free(arch_info->layers_size);
+
+    for(int i = 0; i < arch_info->layers-1; i++) {
+      cudaFree(model->weights[i]);
+      cudaFree(model->biases[i]);
+    }
+    free(model->weights);
+    free(model->biases);
+    free(model->arch_info);
+    free(model);
 }

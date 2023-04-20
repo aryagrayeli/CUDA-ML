@@ -10,31 +10,6 @@
 
 // Spawn N Threads
 __global__ void matrix_mul(double * a, double * b, double * output, int N, int M) {
-    // int n = gridDim.x;
-    // int m = blockDim.x;
-    // int r = blockIdx.x;
-    // int c = threadIdx.x;
-
-    // int Mi = 31 - __builtin_clz(m);
-    // int M = 1 << Mi;
-    // __shared__ double arr[M];
-    // __shared__ double B[m];
-    // cudaMemcpy(arr, a[r], sizeof(double) * m, cudaMemcpyDeviceToDevice);
-    // cudaMemcpy(B, b, sizeof(double) * m, cudaMemcpyDeviceToDevice);
-	// cudaMemset(arr + m, 0, sizeof(double) * (M - m));
-    // arr[c] *= B[c];
-    // __syncthreads();
-    // for (int i = 0; i < Mi; i++) {
-    //     if (c >> (Mi - i - 1)) {
-    //         continue;
-    //     }
-    //     int a = c << (i + 1);
-    //     int b = a + (1 << i);
-    //     arr[a] += arr[b];
-    //     __syncthreads();
-    // }
-
-    // output[r] = *arr; 
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     if(row < N) {
         double sum = 0;

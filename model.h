@@ -74,11 +74,50 @@ Model * initialize_model(ArchInfo * arch_info) {
 }
 
 void save_model(Model * model, char * checkpoint_path) {
-    // TODO
+    FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
+    fprintf(fp, "Model:\n");
+    fprintf(fp, "Layers: %ld\n", model -> arch_info -> layers);
+    // fprintf(fp, "");
+    uint64_t i = 0;
+    while (true) {
+        fprintf(fp, "%ld ", model -> arch_info -> layers_size[i]);
+        if (i != 0) 
+            fprintf(fp, "(%c) ", model -> arch_info -> activation_function[i-1]);  
+        i++;
+        if (model -> arch_info -> layers_size[i] == NULL) break;
+        fprintf(fp, "-> ");
+    }
+
+    fprintf(fp, "\n\nWeights:\n");
+
+    i = 0;
+    while (model -> biases[i] != NULL) {
+        uint64_t j = 0;
+        while (model -> biases[i][j] != NULL) {
+            fprintf(fp, "%ld ", model -> biases[i][j]);
+        }
+    }
+
+    fprintf(fp, "\n\nBiases:\n");
+
+    i = 0;
+    while (model -> weights[i] != NULL) {
+        uint64_t j = 0;
+        while (model -> weights[i][j] != NULL) {
+            fprintf(fp, "%ld ", model -> weights[i][j]);
+        }
+    }
+
+    fclose(fp);
 }
 
 Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
     // TODO
+    FILE* fp = fopen(checkpoint_path, "r");
+
+    // arch_info
+
+    fclose(fp);
     return initialize_model(arch_info);
 }
 

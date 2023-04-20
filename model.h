@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "matmul.cu"
 
-#define ALPHA (0.05)
+#define ALPHA (0.01)
 #define THREADS (32)
 #define NUM_TRAIN (60000)
 #define NUM_TEST (10000)

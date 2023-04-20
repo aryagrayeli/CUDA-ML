@@ -4,5 +4,5 @@ Train: train_data
 Test: test_data
 Checkpoint: weights.pth
 Epochs: 10
-Batch Size: 8
+Batch Size: 32
 Loss: MSE

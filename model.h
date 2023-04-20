@@ -75,6 +75,8 @@ Model * initialize_model(ArchInfo * arch_info) {
 }
 
 void save_model(Model * model, char * checkpoint_path) {
+    printf("Saving Model\n");
+
     FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
 
     cudaDeviceSynchronize();
@@ -102,42 +104,48 @@ void save_model(Model * model, char * checkpoint_path) {
         fprintf(fp, "\n");
     }
 
-    fclose(fp);  
+    fclose(fp);
+
+    printf("Model Saved\n");
 }
 
 Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
+    printf("Loading Model\n");
 
-  FILE * fp = fopen(checkpoint_path, "r");
+    FILE * fp = fopen(checkpoint_path, "r");
 
-  Model * model = (Model *) malloc(sizeof(Model));
-  model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
-  model->weights = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
-  
-  for(int i=0;i<arch_info->layers-1;i++) {
-    uint64_t N = arch_info->layers_size[i+1];
+    Model * model = (Model *) malloc(sizeof(Model));
+    model->arch_info = arch_info;
+    model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
+    model->weights = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
 
-    double * bias = (double *) malloc(sizeof(double) * N);
-    for(int j = 0; j < N; j++)
-      fscanf(fp, " %lf", &(bias[j]));
+    for(int i=0;i<arch_info->layers-1;i++) {
+        uint64_t N = arch_info->layers_size[i+1];
 
-    cudaMalloc(&(model->biases[i]), sizeof(double) * N);
-    cudaMemcpy(model->biases[i], bias, sizeof(double) * N, cudaMemcpyHostToDevice);
-  }
+        double * bias = (double *) malloc(sizeof(double) * N);
+        for(int j = 0; j < N; j++)
+            fscanf(fp, " %lf", &(bias[j]));
 
-  for(int i=0;i<arch_info->layers-1;i++) {
-    uint64_t N = arch_info->layers_size[i+1];
-    uint64_t M = arch_info->layers_size[i];
+        cudaMalloc(&(model->biases[i]), sizeof(double) * N);
+        cudaMemcpy(model->biases[i], bias, sizeof(double) * N, cudaMemcpyHostToDevice);
+    }
 
-    double * weight = (double *) malloc(sizeof(double) * N * M);
-    for(int j = 0; j < N*M; j++)
-      fscanf(fp, " %lf", &(weight[j]));
+    for(int i=0;i<arch_info->layers-1;i++) {
+        uint64_t N = arch_info->layers_size[i+1];
+        uint64_t M = arch_info->layers_size[i];
 
-    cudaMalloc(&(model->weights[i]), sizeof(double) * N * M);
-    cudaMemcpy(model->weights[i], weight, sizeof(double) * N * M, cudaMemcpyHostToDevice);
-  }
+        double * weight = (double *) malloc(sizeof(double) * N * M);
+        for(int j = 0; j < N*M; j++)
+            fscanf(fp, " %lf", &(weight[j]));
 
-  fclose(fp);
-  return model;
+        cudaMalloc(&(model->weights[i]), sizeof(double) * N * M);
+        cudaMemcpy(model->weights[i], weight, sizeof(double) * N * M, cudaMemcpyHostToDevice);
+    }
+
+    fclose(fp);
+
+    printf("Model Loaded\n");
+    return model;
 }
 
 double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
@@ -208,7 +216,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
 
     if(strcmp(loss_func, "MSE") == 0) {
         dim3 gridSz(1,1,1);
-        dim3 blockSz(num_classes * batch_size,1,1);
+        dim3 blockSz(batch_size,1,1);
 
         mse_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layers_size[num_layers-1], batch_size);
     }
@@ -326,7 +334,7 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     close_dataset(dataset);
     close_dataset(labels);
 
-    printf("Saved Model\n\n");
+    printf("\n");
 
     return model;
 }
@@ -337,7 +345,7 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
-    num_images = 16;
+    num_images = 128;
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -371,8 +379,8 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     free(dataloader);
 
-    accuracy/=num_images;
-    printf("Test Accuracy of %f for %d images\n\n", accuracy, num_images);
+    accuracy = (100.0 * accuracy) / num_images;
+    printf("Test Accuracy of %f percent for %d images\n\n", accuracy, num_images);
 
     close_dataset(dataset);
     close_dataset(labels);

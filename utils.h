@@ -50,12 +50,12 @@ double * get_image(FILE * fp, int image_idx) {
     return image;
 }
 
-int get_label(FILE * fp, int label_idx) {
+uint8_t get_label(FILE * fp, int label_idx) {
     int32_t rc[2];
     fseek(fp, 8, SEEK_SET);
     fread(rc, sizeof(int32_t), 2, fp);
 
-    int label[1];
+    uint8_t label[1];
     fseek(fp, 8 + label_idx * sizeof(uint8_t), SEEK_SET);
     fread(label, sizeof(uint8_t), 1, fp);
 
@@ -75,7 +75,7 @@ void shuffle(int * array, int32_t n) {
 double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
     double * true_y = (double *) malloc(sizeof(double)*num_classes*batch_size);
     for(int i = 0; i < batch_size; i++) {
-        int l = get_label(labels, dataloader[idx+i]);
+        uint8_t l = get_label(labels, dataloader[idx+i]);
         for(int j = 0; j < num_classes; j++) {
             if(j == l)
                 true_y[num_classes*i + j] = 1.0;

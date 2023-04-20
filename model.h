@@ -165,22 +165,26 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         cudaMalloc(&delta, sizeof(double) * layers_size[i+1] * batch_size);
 
         if(i == num_layers-2) {
-            vector_sub<<<>>>(layer_vecs[i+1], true_y, delta, layers_size[i+1], batch_size);
+            dim3 gridSz(batch_size, 1, 1);
+            dim3 blockSz(layers_size[i+1], 1, 1);
+            vector_sub<<<gridSz, blockSz>>>(layer_vecs[i+1], true_y, delta, layers_size[i+1] * batch_size);
         } 
         else {
             double * weight_transpose;
             cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+1] * layer_sizes[i]);
-            matrix_trans<<<>>>(weights[i+1], weight_transpose, layer_sizes[i+1], layer_sizes[i]);
+            dim3 gridSz(1, 1, 1);
+            dim3 blockSz(layer_sizes[i+1], layer_sizes[i], 1);
+            matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layer_sizes[i+1], layer_sizes[i]);
 
-            batch_matrix_mul<<<>>>(weights[i+1], layer_delts[i], delta, layer_sizes[i], layer_sizes[i+1], batch_size);
+            batch_matrix_mul<<<1, batch_size>>>(weights[i+1], layer_delts[i], delta, layer_sizes[i], layer_sizes[i+1], batch_size);
         }
 
         double * d_act;
         cudaMalloc(&d_act, sizeof(double) * layers_size[i+1] * batch_size);
-        batch_matrix_mul<<<>>>(weights[i], layer_vecs[i], d_act, layer_sizes[i+1], layer_sizes[i], batch_size);
-        batch_vector_dsigmoid<<<>>>(d_act, d_act, layer_sizes[i+1], batch_size);
+        batch_matrix_mul<<<1, batch_size>>>(weights[i], layer_vecs[i], d_act, layer_sizes[i+1], layer_sizes[i], batch_size);
+        batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layer_sizes[i+1], batch_size);
 
-        vector_hadamard<<<>>>(delta, d_act, delta, layer_sizes[i+1] * batch_size);
+        vector_hadamard<<<1, layer_sizes[i+1] * batch_size>>>(delta, d_act, delta, layer_sizes[i+1] * batch_size);
 
         layer_delts[i] = delta;
     }
@@ -189,12 +193,13 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     for(int i = 0; i < num_layers-1; i++) {
         double * gradients;
         cudaMalloc(&gradients, sizeof(double) * layers_size[i+1] * layers_size[i]);
-        zero_init<<<>>>(gradients, layers_size[i+1] * layers_size[i]);
+        zero_init<<<1, layers_size[i+1] * layers_size[i]>>>(gradients, layers_size[i+1] * layers_size[i]);
 
-        batch_vector_op<<<>>>(layer_delts[i], layer_vecs[i], gradients, layer_sizes[i+1], layer_sizes[i], batch_size);
-        matrix_sub_scalar<<<>>>(weights[i], gradients, (double) ALPHA, weights[i], layer_sizes[i+1], layer_size[i]);
+        dim3 blockSz1(layer_sizes[i+1], layer_sizes[i]);
+        vector_op<<<1, blockSz>>>(layer_delts[i], layer_vecs[i], gradients, layer_sizes[i+1], layer_sizes[i], batch_size);
+        matrix_sub_scalar<<<1, blockSz>>>(weights[i], gradients, (double) ALPHA, weights[i], layer_sizes[i+1], layer_size[i]);
 
-        vector_sub_scalar<<<>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layer_sizes[i+1]);
+        vector_sub_scalar<<<1, layer_sizes[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layer_sizes[i+1]);
     }
 
 

@@ -269,7 +269,7 @@ __global__ void vector_hadamard(double * a, double * b, double * output, int N) 
 }
 
 // Spawn N x M Threads
-__global__ matrix_sub_scalar(double * a, double * b, double sc, double * output, int N, int M) {
+__global__ void matrix_sub_scalar(double * a, double * b, double sc, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M)
@@ -277,7 +277,7 @@ __global__ matrix_sub_scalar(double * a, double * b, double sc, double * output,
 }
 
 // Spawn N Threads
-__global__ vector_sub_scalar(double * a, double * b, double sc, double * output, int N) {
+__global__ void vector_sub_scalar(double * a, double * b, double sc, double * output, int N) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < N)
         output[i] = a[i] - sc * b[i];

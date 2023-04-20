@@ -73,105 +73,70 @@ Model * initialize_model(ArchInfo * arch_info) {
     return model;
 }
 
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-
-typedef struct ArchInfo {
-  uint64_t layers;
-  uint64_t * layers_size;
-  char ** activation_function;
-} ArchInfo;
-
-typedef struct Model {
-    double ** weights; // list of 2D weight matrix for each layer but flattened so 1D for CUDA
-    double ** biases; // list of 1D bias vectors for each layer
-    ArchInfo * arch_info; // architecture info
-} Model;
-
-
 void save_model(Model * model, char * checkpoint_path) {
-  FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
-  
-  for(int i=0;i<model->arch_info->layers-1;i++) {
-    for(int j=0;j<model->arch_info->layers_size[i+1];j++)
-      fprintf(fp, "%lf ", model->biases[i][j]);
-    fprintf(fp, "\n");
-  }
+    FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
 
-  for(int i=0;i<model->arch_info->layers-1;i++) {
-    for(int j=0;j<(model->arch_info->layers_size[i] * model->arch_info->layers_size[i+1]);j++)
-      fprintf(fp, "%lf ", model->weights[i][j]);
-    fprintf(fp, "\n");
-  }
+    cudaDeviceSynchronize();
 
-  fclose(fp);
-  
+    for(int i=0;i<model->arch_info->layers-1;i++) {
+        uint64_t N = model->arch_info->layers_size[i+1];
+
+        double * bias = (double *) malloc(sizeof(double) * N);
+        cudaMemcpy(bias, model->biases[i], sizeof(double) * N, cudaMemcpyDeviceToHost);
+
+        for(int j = 0; j < N; j++)
+            fprintf(fp, "%lf ", bias[j]);
+        fprintf(fp, "\n");
+    }
+
+    for(int i=0;i<model->arch_info->layers-1;i++) {
+        uint64_t N = model->arch_info->layers_size[i+1];
+        uint64_t M = model->arch_info->layers_size[i];
+
+        double * weight = (double *) malloc(sizeof(double) * N * M);
+        cudaMemcpy(weight, model->weights[i], sizeof(double) * N * M, cudaMemcpyDeviceToHost);
+
+        for(int j = 0; j < N*M; j++)
+            fprintf(fp, "%lf ", weight[j]);
+        fprintf(fp, "\n");
+    }
+
+    fclose(fp);  
 }
 
 Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
 
-  FILE* fp = fopen(checkpoint_path, "r");
+  FILE * fp = fopen(checkpoint_path, "r");
 
-  // should this be on GPU memory? Can change easily
-  Model* loaded_model = (Model*)malloc(sizeof(Model));
-  loaded_model->biases = (double**)(malloc(sizeof(double*) * (arch_info->layers-1)));
+  Model * model = (Model *) malloc(sizeof(Model));
+  model->biases = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
+  model->weights = (double **) malloc(sizeof(double*) * (arch_info->layers-1));
   
   for(int i=0;i<arch_info->layers-1;i++) {
-    loaded_model->biases[i] = (double*)(malloc(sizeof(double) * arch_info->layers_size[i+1]));
-    for(int j=0;j<arch_info->layers_size[i+1];j++)
-      fscanf(fp, " %lf", &loaded_model->biases[i][j]);
+    uint64_t N = arch_info->layers_size[i+1];
+
+    double * bias = (double *) malloc(sizeof(double) * N);
+    for(int j = 0; j < N; j++)
+      fscanf(fp, " %lf", &(bias[j]));
+
+    cudaMalloc(&(model->biases[i]), sizeof(double) * N);
+    cudaMemcpy(model->biases[i], bias, sizeof(double) * N, cudaMemcpyHostToDevice);
   }
 
   for(int i=0;i<arch_info->layers-1;i++) {
-    loaded_model->weights[i] = (double*)(malloc(sizeof(double) * arch_info->layers_size[i] * arch_info->layers_size[i+1]));
-    for(int j=0;j<(arch_info->layers_size[i] * arch_info->layers_size[i+1]);j++)
-      fscanf(fp, " %lf", &loaded_model->weights[i][j]);
+    uint64_t N = arch_info->layers_size[i+1];
+    uint64_t M = arch_info->layers_size[i];
+
+    double * weight = (double *) malloc(sizeof(double) * N * M);
+    for(int j = 0; j < N*M; j++)
+      fscanf(fp, " %lf", &(weight[j]));
+
+    cudaMalloc(&(model->weights[i]), sizeof(double) * N * M);
+    cudaMemcpy(model->weights[i], weight, sizeof(double) * N * M, cudaMemcpyHostToDevice);
   }
 
   fclose(fp);
-  return loaded_model;
-}
-
-
-
-void __save_model(Model * model, char * checkpoint_path) {
-    FILE* fp = fopen(checkpoint_path, "w");// "w" means that we are going to write on this file
-    fprintf(fp, "Model:\n");
-    fprintf(fp, "Layers: %ld\n", model -> arch_info -> layers);
-    // fprintf(fp, "");
-    uint64_t i = 0;
-    while (true) {
-        fprintf(fp, "%ld ", model -> arch_info -> layers_size[i]);
-        if (i != 0) 
-            fprintf(fp, "(%c) ", model -> arch_info -> activation_function[i-1]);  
-        i++;
-        if (model -> arch_info -> layers_size[i] == NULL) break;
-        fprintf(fp, "-> ");
-    }
-
-    fprintf(fp, "\n\nWeights:\n");
-
-    i = 0;
-    while (model -> biases[i] != NULL) {
-        uint64_t j = 0;
-        while (model -> biases[i][j] != NULL) {
-            fprintf(fp, "%ld ", model -> biases[i][j]);
-        }
-    }
-
-    fprintf(fp, "\n\nBiases:\n");
-
-    i = 0;
-    while (model -> weights[i] != NULL) {
-        uint64_t j = 0;
-        while (model -> weights[i][j] != NULL) {
-            fprintf(fp, "%ld ", model -> weights[i][j]);
-        }
-    }
-
-    fclose(fp);
+  return model;
 }
 
 double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
@@ -244,7 +209,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         dim3 gridSz(1,1,1);
         dim3 blockSz(num_classes * batch_size,1,1);
 
-        mse_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layer_sizes[num_layers-1], batch_size);
+        mse_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layers_size[num_layers-1], batch_size);
     }
     else // invalid, only MSE loss supported currently
         return -1.0;
@@ -263,20 +228,20 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         } 
         else {
             double * weight_transpose;
-            cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+1] * layer_sizes[i]);
+            cudaMalloc(&weight_transpose, sizeof(double) * layers_size[i+1] * layers_size[i]);
             dim3 gridSz(1, 1, 1);
-            dim3 blockSz(layer_sizes[i+1], layer_sizes[i], 1);
-            matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layer_sizes[i+1], layer_sizes[i]);
+            dim3 blockSz(layers_size[i+1], layers_size[i], 1);
+            matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layers_size[i+1], layers_size[i]);
 
-            batch_matrix_mul<<<1, batch_size>>>(weights[i+1], layer_delts[i], delta, layer_sizes[i], layer_sizes[i+1], batch_size);
+            batch_matrix_mul<<<1, batch_size>>>(weights[i+1], layer_delts[i], delta, layers_size[i], layers_size[i+1], batch_size);
         }
 
         double * d_act;
         cudaMalloc(&d_act, sizeof(double) * layers_size[i+1] * batch_size);
-        batch_matrix_mul<<<1, batch_size>>>(weights[i], layer_vecs[i], d_act, layer_sizes[i+1], layer_sizes[i], batch_size);
-        batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layer_sizes[i+1], batch_size);
+        batch_matrix_mul<<<1, batch_size>>>(weights[i], layer_vecs[i], d_act, layers_size[i+1], layers_size[i], batch_size);
+        batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
 
-        vector_hadamard<<<1, layer_sizes[i+1] * batch_size>>>(delta, d_act, delta, layer_sizes[i+1] * batch_size);
+        vector_hadamard<<<1, layers_size[i+1] * batch_size>>>(delta, d_act, delta, layers_size[i+1] * batch_size);
 
         layer_delts[i] = delta;
     }
@@ -287,11 +252,11 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         cudaMalloc(&gradients, sizeof(double) * layers_size[i+1] * layers_size[i]);
         zero_init<<<1, layers_size[i+1] * layers_size[i]>>>(gradients, layers_size[i+1] * layers_size[i]);
 
-        dim3 blockSz1(layer_sizes[i+1], layer_sizes[i]);
-        vector_op<<<1, blockSz>>>(layer_delts[i], layer_vecs[i], gradients, layer_sizes[i+1], layer_sizes[i], batch_size);
-        matrix_sub_scalar<<<1, blockSz>>>(weights[i], gradients, (double) ALPHA, weights[i], layer_sizes[i+1], layer_size[i]);
+        dim3 blockSz(layers_size[i+1], layers_size[i]);
+        vector_op<<<1, blockSz>>>(layer_delts[i], layer_vecs[i], gradients, layers_size[i+1], layers_size[i], batch_size);
+        matrix_sub_scalar<<<1, blockSz>>>(weights[i], gradients, (double) ALPHA, weights[i], layers_size[i+1], layers_size[i]);
 
-        vector_sub_scalar<<<1, layer_sizes[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layer_sizes[i+1]);
+        vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layers_size[i+1]);
     }
 
 

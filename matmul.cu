@@ -231,16 +231,6 @@ __global__ void vector_sub(double * a, double * b, double * output, int N) {
         output[i] = a[i] - b[i];
 }
 
-// Spawn B Threads
-__global__ void batch_vector_sub(double * a, double * b, double * output, int N, int B) {
-    int batch = blockIdx.x * blockDim.x + threadIdx.x;
-    if(batch < B) {
-        dim3 gridSz(1, 1, 1);
-        dim3 blockSz(N, 1, 1);
-        vector_sub<<<gridSz, blockSz>>>(a + (batch * N), b, output + (batch * N), N);
-    }
-}
-
 // Spawn N Threads
 __global__ void matrix_hadamard(double * a, double * b, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -294,4 +284,11 @@ __global__ void zero_init(double * output, int N) {
 __global__ void setup_kernel(curandState * state, uint64_t seed) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     curand_init(seed, i, 0, &state[i]);
+}
+
+// Spawn TOTAL N Threads
+__global__ void vector_hadamard(double * a, double * b, double * output, int N) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if(i < N)
+        output[i] = a[i] * b[i];
 }

@@ -153,8 +153,7 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
         cudaMemcpy(input + (i * size), pixels, sizeof(double) * size, cudaMemcpyHostToDevice);
     }
 
-    double ** layer_vecs;
-    cudaMalloc(&layer_vecs, sizeof(double *) * arch_info->layers);
+    double ** layer_vecs = (double **) malloc(sizeof(double*) * arch_info->layers);
 
     for(int l = 0; l < arch_info->layers-1; l++) {
         int prev_size = (int) arch_info->layers_size[l];
@@ -214,8 +213,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     else // invalid, only MSE loss supported currently
         return -1.0;
 
-    double ** layer_delts;
-    cudaMalloc(&layer_delts, sizeof(double *) * (num_layers-1));
+    double ** layer_delts = (double **) malloc(sizeof(double*) * (num_layers-1));
 
     for(int i = num_layers-2; i >= 0; i--) {
         double * delta;
@@ -233,6 +231,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
             dim3 blockSz(layers_size[i+1], layers_size[i], 1);
             matrix_trans<<<gridSz, blockSz>>>(weights[i+1], weight_transpose, layers_size[i+1], layers_size[i]);
 
+            cudaFree(weight_transpose);
             batch_matrix_mul<<<1, batch_size>>>(weights[i+1], layer_delts[i], delta, layers_size[i], layers_size[i+1], batch_size);
         }
 
@@ -243,6 +242,7 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
 
         vector_hadamard<<<1, layers_size[i+1] * batch_size>>>(delta, d_act, delta, layers_size[i+1] * batch_size);
 
+        cudaFree(d_act);
         layer_delts[i] = delta;
     }
 
@@ -257,8 +257,9 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         matrix_sub_scalar<<<1, blockSz>>>(weights[i], gradients, (double) ALPHA, weights[i], layers_size[i+1], layers_size[i]);
 
         vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layers_size[i+1]);
-    }
 
+        cudaFree(gradients);
+    }
 
     // output summed loss
     double * loss = (double *) malloc(sizeof(double) * batch_size);
@@ -269,11 +270,25 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     for(int i = 0; i < batch_size; i++)
         sum_loss += loss[i];
 
+
+    // free everything
+    for(int i = 0; i < arch_info->layers; i++) {
+        cudaFree(layer_vecs[i]);
+        cudaFree(layer_delts[i]);
+    }
+
+    free(layer_vecs);
+    free(layer_delts);
+    free(true_y_cpu);
+    cudaFree(true_y);
+    cudaFree(batch_loss);
+    free(loss);
+
     return sum_loss; // loss value
 }
 
 
-void train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
+Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     printf("Beginning Training\n");
 
     FILE * dataset = load_dataset(concat(dataset_info->train_files,"/train-images.idx3-ubyte"));
@@ -303,22 +318,24 @@ void train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
         printf("After Epoch %d, Train Loss: %f\n", e, running_loss);
     }
 
+    free(dataloader);
+
     save_model(model, dataset_info->checkpoint_path);
     close_dataset(dataset);
     close_dataset(labels);
 
     printf("Saved Model\n\n");
+
+    return model;
 }
 
-void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
+void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
     printf("Beginning Testing\n");
 
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
     int32_t num_images = get_dataset_size(dataset);
     num_images = 16;
-    
-    Model * model = load_model(dataset_info->checkpoint_path, arch_info);
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
@@ -329,18 +346,28 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     double accuracy = 0.0;
     for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
-        double * pred_y_gpu = forward(model, dataset, dataloader, idx, dataset_info->batch_size)[arch_info->layers-1];
+        double ** layer_vecs = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
         double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
 
         double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
         cudaDeviceSynchronize();
-        cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
+        cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
         
         for(int i = 0; i < dataset_info->batch_size; i++) {
             if(arg_max(pred_y,i) == arg_max(true_y,i))
                 accuracy++;
         }
+
+        // free
+        for(int i = 0; i < arch_info->layers; i++)
+            cudaFree(layer_vecs[i]);
+
+        free(layer_vecs);
+        free(pred_y);
+        free(true_y);
     }
+
+    free(dataloader);
 
     accuracy/=num_images;
     printf("Test Accuracy of %f for %d images\n\n", accuracy, num_images);
@@ -349,27 +376,33 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
     close_dataset(labels);
 }
 
-void predict(DatasetInfo * dataset_info, ArchInfo * arch_info, int image_idx) {
+void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, int image_idx) {
     printf("Beginning Prediction on Image #%d\n", image_idx);
     
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
-
-    Model * model = load_model(dataset_info->checkpoint_path, arch_info);
 
     int dataloader[1];
     dataloader[0] = image_idx;
 
     printf("Image and Model Initalized\n");
 
-    double * pred_y_gpu = forward(model, dataset, dataloader, 0, 1)[arch_info->layers-1];
+    double ** layer_vecs = forward(model, dataset, dataloader, 0, 1);
     double * true_y = load_labels(labels, dataloader, 0, 1);
 
     double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
     cudaDeviceSynchronize();
-    cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
+    cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
 
     printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));
+
+    // free
+    for(int i = 0; i < arch_info->layers; i++)
+        cudaFree(layer_vecs[i]);
+
+    free(layer_vecs);
+    free(pred_y);
+    free(true_y);
 
     close_dataset(dataset);
     close_dataset(labels);

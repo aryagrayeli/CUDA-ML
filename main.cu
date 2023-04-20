@@ -165,7 +165,10 @@ int main(int argc, char **argv) {
 
     printf("Loaded Arch File\n\n");
 
-    train(dataset_info, arch_info);
-    test(dataset_info, arch_info);
-    predict(dataset_info, arch_info, 1);
+    Model * model = train(dataset_info, arch_info);
+    // Model * model = load_model(dataset_info->checkpoint_path, arch_info); // to load model if not training
+    test(model, dataset_info, arch_info);
+    predict(model, dataset_info, arch_info, 1);
+
+    // free everything in model, dataset_info and arch_info
 }

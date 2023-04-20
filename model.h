@@ -8,6 +8,7 @@
 #include "matmul.cu"
 
 #define ALPHA (0.05)
+#define THREADS (32)
 
 typedef struct DatasetInfo {
   char * train_files;
@@ -43,8 +44,8 @@ Model * initialize_model(ArchInfo * arch_info) {
         // different initialization depending on the activation function
         char * act_func = arch_info->activation_function[i+1];
 
-        dim3 gridSz(1, 1, 1);
-        dim3 blockSz(n*m, 1, 1);
+        dim3 gridSz((n*m + THREADS - 1) / THREADS, 1, 1);
+        dim3 blockSz(THREADS, 1, 1);
 
         curandState * state;
         cudaMalloc(&state, n*m * sizeof(curandState));
@@ -63,8 +64,8 @@ Model * initialize_model(ArchInfo * arch_info) {
         int m = (int) arch_info->layers_size[i+1];
         cudaMalloc(&(model->biases[i]), sizeof(double) * m);
 
-        dim3 gridSz(1, 1, 1);
-        dim3 blockSz(m, 1, 1);
+        dim3 gridSz((m + THREADS - 1) / THREADS, 1, 1);
+        dim3 blockSz(THREADS, 1, 1);
 
         // gpu initialize model->biases[i] in parallel
         zero_init<<<gridSz, blockSz>>>(model->biases[i], m);
@@ -178,8 +179,8 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
         double * output;
         cudaMalloc(&output, sizeof(double) * next_size * batch_size);
 
-        dim3 gridSz(1,1,1);
-        dim3 blockSz(batch_size,1,1);
+        dim3 gridSz((batch_size + THREADS - 1)/THREADS,1,1);
+        dim3 blockSz(THREADS,1,1);
 
         batch_matrix_mul<<<gridSz,blockSz>>>(weights[l], input, output, next_size, prev_size, batch_size);
         batch_vector_add<<<gridSz,blockSz>>>(output, biases[l], output, next_size, batch_size);
@@ -221,8 +222,8 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     cudaMalloc(&batch_loss, sizeof(double) * batch_size);
 
     if(strcmp(loss_func, "MSE") == 0) {
-        dim3 gridSz(1,1,1);
-        dim3 blockSz(batch_size,1,1);
+        dim3 gridSz((batch_size + THREADS - 1)/THREADS,1,1);
+        dim3 blockSz(THREADS,1,1);
 
         mse_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layers_size[num_layers-1], batch_size);
     }
@@ -236,8 +237,9 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         cudaMalloc(&delta, sizeof(double) * layers_size[i+1] * batch_size);
 
         if(i == num_layers-2) {
-            dim3 gridSz(batch_size, 1, 1);
-            dim3 blockSz(layers_size[i+1], 1, 1);
+            long totalThreads = layers_size[i+1] * batch_size;
+            dim3 gridSz((totalThreads + THREADS - 1)/THREADS, 1, 1);
+            dim3 blockSz(THREADS, 1, 1);
             vector_sub<<<gridSz, blockSz>>>(layer_vecs[i+1], true_y, delta, layers_size[i+1] * batch_size);
         } 
         else {
@@ -256,7 +258,9 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         batch_matrix_mul<<<1, batch_size>>>(weights[i], layer_vecs[i], d_act, layers_size[i+1], layers_size[i], batch_size);
         batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
 
-        vector_hadamard<<<1, layers_size[i+1] * batch_size>>>(delta, d_act, delta, layers_size[i+1] * batch_size);
+        dim3 gridSz((layers_size[i+1] * batch_size + THREADS - 1)/THREADS, 1, 1);
+        dim3 blockSz(THREADS, 1, 1);
+        vector_hadamard<<<gridSz, blockSz>>>(delta, d_act, delta, layers_size[i+1] * batch_size);
 
         cudaFree(d_act);
         layer_delts[i] = delta;
@@ -266,11 +270,14 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
     for(int i = 0; i < num_layers-1; i++) {
         double * gradients;
         cudaMalloc(&gradients, sizeof(double) * layers_size[i+1] * layers_size[i]);
-        zero_init<<<1, layers_size[i+1] * layers_size[i]>>>(gradients, layers_size[i+1] * layers_size[i]);
+        dim3 gridSz1((layers_size[i+1] * layers_size[i] + THREADS - 1)/THREADS, 1, 1);
+        dim3 blockSz1(THREADS, 1, 1);
+        zero_init<<<gridSz1, blockSz1>>>(gradients, layers_size[i+1] * layers_size[i]);
 
-        dim3 blockSz(layers_size[i+1], layers_size[i]);
-        vector_op<<<1, blockSz>>>(layer_delts[i], layer_vecs[i], gradients, layers_size[i+1], layers_size[i], batch_size);
-        matrix_sub_scalar<<<1, blockSz>>>(weights[i], gradients, (double) ALPHA, weights[i], layers_size[i+1], layers_size[i]);
+        dim3 gridSz2((layers_size[i+1] + THREADS - 1)/THREADS, (layers_size[i] + THREADS - 1)/THREADS, 1);
+        dim3 blockSz2(THREADS, THREADS);
+        vector_op<<<gridSz2, blockSz2>>>(layer_delts[i], layer_vecs[i], gradients, layers_size[i+1], layers_size[i], batch_size);
+        matrix_sub_scalar<<<gridSz2, blockSz2>>>(weights[i], gradients, (double) ALPHA, weights[i], layers_size[i+1], layers_size[i]);
 
         vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layers_size[i+1]);
 

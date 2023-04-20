@@ -47,6 +47,7 @@ Model * initialize_model(ArchInfo * arch_info) {
         curandState * state;
         cudaMalloc(&state, n*m * sizeof(curandState));
         setup_kernel<<<gridSz,blockSz>>>(state, time(NULL));
+        
 
         if(strcmp(act_func, "ReLU") == 0)
             he_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
@@ -116,6 +117,7 @@ double * forward(Model * model, FILE * dataset, int * dataloader, int idx, int b
         if(strcmp(act, "softmax") == 0)
             batch_vector_softmax<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
 
+        
         cudaFree(input);
         input = output; // dont copy over just move pointer
     }
@@ -190,6 +192,7 @@ void test(DatasetInfo * dataset_info, ArchInfo * arch_info) {
         double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
 
         double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
+        cudaDeviceSynchronize();
         cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
         
         for(int i = 0; i < dataset_info->batch_size; i++) {
@@ -222,6 +225,7 @@ void predict(DatasetInfo * dataset_info, ArchInfo * arch_info, int image_idx) {
     double * true_y = load_labels(labels, dataloader, 0, 1);
 
     double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
+    cudaDeviceSynchronize();
     cudaMemcpy(pred_y, pred_y_gpu, sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
 
     printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));

@@ -32,6 +32,7 @@ Notes:
 - How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
 - How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
 - CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
+- Dataset from: http://yann.lecun.com/exdb/mnist/
 
 - For reference, the format.arch file has an example that gets 98% test accuracy after 2 minutes of training
 - For large networks, doing ReLU w/ a softmax causes exploding gradients

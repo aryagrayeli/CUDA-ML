@@ -1,8 +1,9 @@
 Layers: 4
-784 -> 128 (sigmoid) -> 64 (sigmoid) -> 10 (sigmoid)
+784 -> 128 (sigmoid) -> 64 (sigmoid) -> 10 (softmax)
 Train: train_data
 Test: test_data
-Checkpoint: weights.pth
-Epochs: 15  
+Checkpoint: test.pth
+Epochs: 2  
 Batch Size: 128
-Loss: MSE
+Alpha: 0.01
+Loss: CrossEntropy

@@ -76,6 +76,43 @@ uint64_t consume_literal() {
   }
 }
 
+double consume_double() {
+  skip();
+
+  bool negate = false;
+  if(*current == '-') {
+    current++;
+    negate = true;
+  }
+  if (isdigit(*current)) {
+    double v = 0.0;
+    do {
+      v = 10 * v + ((*current) - '0');
+      current += 1;
+    } while (isdigit(*current));
+
+    if(consume(".")) {
+      double dv = 0.0;
+      int count = 0;
+      do {
+        dv = 10 * dv + ((*current) - '0');
+        current += 1;
+        count += 1;
+      } while (isdigit(*current));
+
+      while(count > 0) {
+        dv /= 10.0;
+        count--;
+      }
+      v = v + dv;
+    }
+    return v * (negate ? -1 : 1);
+  } else {
+    fail();
+    return 0;
+  }
+}
+
 char* consume_identifier() {
   skip();
 
@@ -160,13 +197,16 @@ int main(int argc, char **argv) {
     consume_or_fail("Batch Size: ");
     dataset_info->batch_size = consume_literal();
 
+    consume_or_fail("Alpha: ");
+    dataset_info->alpha = consume_double();
+
     consume_or_fail("Loss: ");
     dataset_info->loss_func = consume_identifier();
 
     printf("Loaded Arch File\n\n");
 
-    // Model * model = train(dataset_info, arch_info);
-    Model * model = load_model(dataset_info->checkpoint_path, arch_info); // to load model if not training
+    Model * model = train(dataset_info, arch_info);
+    // Model * model = load_model(dataset_info->checkpoint_path, arch_info); // to load model if not training
 
     test(model, dataset_info, arch_info);
     predict(model, dataset_info, arch_info, 1);

@@ -18,9 +18,15 @@ Implementing an ML language in CUDA
     - Path to where weights while be saved (Checkpoint: path)
     - Number of training epochs (Epochs: #)
     - Batch size (Batch Size: #)
+    - Learning Rate (Alpha: double)
     - Loss function (Loss: name)
-        - Losses: MSE
+        - Losses: MSE, CrossEntropy
 
-How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
-How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
-CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
+
+Notes:
+- Softmax can only be used as the final layer and only with CrossEntropy loss (not MSE!)
+- Optimizer thats always used is Mini-Batch Gradient Descent
+
+- How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
+- How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
+- CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf

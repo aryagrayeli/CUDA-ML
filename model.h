@@ -7,12 +7,7 @@
 #include "utils.h"
 #include "matmul.cu"
 
-#define ALPHA (0.01)
 #define THREADS (32)
-#define NUM_TRAIN (60000)
-#define NUM_TEST (10000)
-#define IM_WIDTH (28)
-#define IM_HEIGHT (28)
 
 typedef struct DatasetInfo {
   char * train_files;
@@ -20,6 +15,7 @@ typedef struct DatasetInfo {
   char * checkpoint_path;
   uint64_t epochs;
   uint64_t batch_size;
+  double alpha;
   char * loss_func;
 } DatasetInfo;
 
@@ -192,11 +188,11 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
         char * act = arch_info->activation_function[l+1];
         if(strcmp(act, "ReLU") == 0)
             batch_vector_relu<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
-        if(strcmp(act, "sigmoid") == 0)
+        else if(strcmp(act, "sigmoid") == 0)
             batch_vector_sigmoid<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
-        if(strcmp(act, "tanh") == 0)
+        else if(strcmp(act, "tanh") == 0)
             batch_vector_tanh<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
-        if(strcmp(act, "softmax") == 0)
+        else if(strcmp(act, "softmax") == 0)
             batch_vector_softmax<<<gridSz,blockSz>>>(output, output, next_size, batch_size);
 
         layer_vecs[l] = input;
@@ -207,12 +203,13 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
     return layer_vecs;
 }
 
-double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char * loss_func, int batch_size) {
+double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char * loss_func, int batch_size, double alpha) {
     double ** weights = model->weights;
     double ** biases = model->biases;
     ArchInfo * arch_info = model->arch_info;
     uint64_t num_layers = arch_info->layers;
     uint64_t * layers_size = arch_info->layers_size;
+    uint64_t num_classes = layers_size[num_layers - 1];
 
     // get last layer output
     double * pred_y = layer_vecs[num_layers-1];
@@ -231,8 +228,26 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
 
         mse_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layers_size[num_layers-1], batch_size);
     }
-    else // invalid, only MSE loss supported currently
+    else if(strcmp(loss_func, "CrossEntropy") == 0) {
+        dim3 gridSz((batch_size + THREADS - 1)/THREADS,1,1);
+        dim3 blockSz(THREADS,1,1);
+
+        cross_entropy_loss<<<gridSz,blockSz>>>(pred_y, true_y, batch_loss, layers_size[num_layers-1], batch_size);
+    }
+    else { // invalid, only MSE and CrossEntropy loss supported currently
+        printf("Invalid Loss Function: %s\n", loss_func);
+
+        // free everything
+        for(int i = 0; i < arch_info->layers; i++) {
+            cudaFree(layer_vecs[i]);
+        }
+
+        free(layer_vecs);
+        free(true_y_cpu);
+        cudaFree(true_y);
+        cudaFree(batch_loss);
         return -1.0;
+    }
     
     double ** layer_delts = (double **) malloc(sizeof(double*) * (num_layers-1));
 
@@ -245,6 +260,11 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
             dim3 gridSz((totalThreads + THREADS - 1)/THREADS, 1, 1);
             dim3 blockSz(THREADS, 1, 1);
             vector_sub<<<gridSz, blockSz>>>(layer_vecs[i+1], true_y, delta, layers_size[i+1] * batch_size);
+
+            if(strcmp(arch_info->activation_function[i+1], "softmax") == 0) { // assuming cross entropy loss as in spec
+                layer_delts[i] = delta;
+                continue;
+            }
         } 
         else {
             double * weight_transpose;
@@ -257,18 +277,17 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
             cudaFree(weight_transpose);
         }
 
-        // double * delta_cpu = (double *) malloc(sizeof(double) * layers_size[i+1] * batch_size);
-        // cudaDeviceSynchronize();
-        // cudaMemcpy(delta_cpu, delta, sizeof(double) * layers_size[i+1] * batch_size, cudaMemcpyDeviceToHost);
-        // for(int j = 0; j < layers_size[i+1] * batch_size; j++)
-        //     printf("%lf ", delta_cpu[j]);
-        // printf("\n\n");
-
-
         double * d_act;
         cudaMalloc(&d_act, sizeof(double) * layers_size[i+1] * batch_size);
         batch_matrix_mul<<<1, batch_size>>>(weights[i], layer_vecs[i], d_act, layers_size[i+1], layers_size[i], batch_size);
-        batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
+
+        char * act = arch_info->activation_function[i+1];
+        if(strcmp(act, "ReLU") == 0)
+            batch_vector_drelu<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
+        else if(strcmp(act, "sigmoid") == 0)
+            batch_vector_dsigmoid<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
+        else if(strcmp(act, "tanh") == 0)
+            batch_vector_dtanh<<<1, batch_size>>>(d_act, d_act, layers_size[i+1], batch_size);
 
         dim3 gridSz((layers_size[i+1] * batch_size + THREADS - 1)/THREADS, 1, 1);
         dim3 blockSz(THREADS, 1, 1);
@@ -289,9 +308,9 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         dim3 gridSz2((layers_size[i+1] + THREADS - 1)/THREADS, (layers_size[i] + THREADS - 1)/THREADS, 1);
         dim3 blockSz2(THREADS, THREADS);
         vector_op<<<gridSz2, blockSz2>>>(layer_delts[i], layer_vecs[i], gradients, layers_size[i+1], layers_size[i], batch_size);
-        matrix_sub_scalar<<<gridSz2, blockSz2>>>(weights[i], gradients, (double) ALPHA, weights[i], layers_size[i+1], layers_size[i]);
+        matrix_sub_scalar<<<gridSz2, blockSz2>>>(weights[i], gradients, alpha, weights[i], layers_size[i+1], layers_size[i]);
 
-        vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], (double) ALPHA, biases[i], layers_size[i+1]);
+        vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], alpha, biases[i], layers_size[i+1]);
 
         cudaFree(gradients);
     }
@@ -328,16 +347,17 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     FILE * dataset = load_dataset(concat(dataset_info->train_files,"/train-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->train_files,"/train-labels.idx1-ubyte"));
-    int32_t num_images = NUM_TRAIN;
+    uint32_t num_images = get_dataset_size(dataset);
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
         dataloader[i] = i;
     }
+    uint64_t num_classes = arch_info->layers_size[arch_info->layers-1];
 
     Model * model = initialize_model(arch_info);
 
-    printf("Dataset and Model Initalized\n");
+    printf("Dataset and Model Initalized. Training on %d Images\n", num_images);
 
     for(int e = 0; e < dataset_info->epochs; e++) {
         shuffle(dataloader, num_images);
@@ -345,10 +365,15 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
         double running_loss = 0.0;
         for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
             double ** layer_vecs = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
-            double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
-            double loss = backward(layer_vecs, true_y, model, dataset_info->loss_func, dataset_info->batch_size);
+            double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size, num_classes);
+            double loss = backward(layer_vecs, true_y, model, dataset_info->loss_func, dataset_info->batch_size, dataset_info->alpha);
+
             running_loss+=loss;
+            if(loss < 0.0) // negative loss is not possible, must have been an error inside backward
+                break;
         }
+        if(running_loss < 0.0)
+            break;
         running_loss /= num_images;
         printf("After Epoch %d, Train Loss: %f\n", e, running_loss);
     }
@@ -369,26 +394,27 @@ void test(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info) {
 
     FILE * dataset = load_dataset(concat(dataset_info->test_files,"/test-images.idx3-ubyte"));
     FILE * labels = load_dataset(concat(dataset_info->test_files,"/test-labels.idx1-ubyte"));
-    int32_t num_images = NUM_TEST;
+    uint32_t num_images = get_dataset_size(dataset);
 
     int * dataloader = (int *) malloc(sizeof(int) * num_images);
     for(int i = 0; i < num_images; i++) {
         dataloader[i] = i;
     }
+    uint64_t num_classes = arch_info->layers_size[arch_info->layers-1];
 
-    printf("Dataset and Model Initalized\n");
+    printf("Dataset and Model Initalized. Testing on %d Images\n", num_images);
 
     double accuracy = 0.0;
     for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
         double ** layer_vecs = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
-        double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size);
+        double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size, num_classes);
 
         double * pred_y = (double *) malloc(sizeof(double) * num_classes * dataset_info->batch_size);
         cudaDeviceSynchronize();
         cudaMemcpy(pred_y, layer_vecs[arch_info->layers-1], sizeof(double) * num_classes * dataset_info->batch_size, cudaMemcpyDeviceToHost);
         
         for(int i = 0; i < dataset_info->batch_size; i++) {
-            if(arg_max(pred_y,i) == arg_max(true_y,i))
+            if(arg_max(pred_y,i,num_classes) == arg_max(true_y,i,num_classes))
                 accuracy++;
         }
 
@@ -418,11 +444,12 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
 
     int dataloader[1];
     dataloader[0] = image_idx;
+    uint64_t num_classes = arch_info->layers_size[arch_info->layers-1];
 
     printf("Image and Model Initalized\n");
 
     double ** layer_vecs = forward(model, dataset, dataloader, 0, 1);
-    double * true_y = load_labels(labels, dataloader, 0, 1);
+    double * true_y = load_labels(labels, dataloader, 0, 1, num_classes);
 
     double * pred_y = (double *) malloc(sizeof(double) * num_classes * 1);
     cudaDeviceSynchronize();
@@ -430,10 +457,14 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
 
     double * image = get_image(dataset, image_idx);
 
+    uint32_t im_width = get_image_width(dataset);
+    uint32_t im_height = get_image_height(dataset);
+    double threshold = 0.01; // only for visualization doesn't really matter
+
     printf("Displaying Image #%d:\n", image_idx);
-    for(int i = 0; i < IM_WIDTH; i++) {
-        for(int j = 0; j < IM_HEIGHT; j++) {
-            if(image[IM_HEIGHT*i+j] > 0.01)
+    for(int i = 0; i < im_height; i++) {
+        for(int j = 0; j < im_width; j++) {
+            if(image[im_width*i+j] > threshold)
                 printf(". ");
             else
                 printf("  ");
@@ -448,7 +479,9 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
     }
     printf("\n");
  
-    printf("Predicted: %d, Actual: %d\n\n", arg_max(pred_y,0), arg_max(true_y,0));
+    int pred = arg_max(pred_y,0,num_classes);
+    printf("Predicted: %d, Actual: %d\n\n", pred, arg_max(true_y,0,num_classes));
+    printf("Confidence on Prediction: %lf\n", pred_y[pred]);
 
     // free
     for(int i = 0; i < arch_info->layers; i++)
@@ -457,6 +490,7 @@ void predict(Model * model, DatasetInfo * dataset_info, ArchInfo * arch_info, in
     free(layer_vecs);
     free(pred_y);
     free(true_y);
+    free(image);
 
     close_dataset(dataset);
     close_dataset(labels);

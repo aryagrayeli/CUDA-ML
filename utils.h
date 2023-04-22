@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define num_classes (10)
-
 
 char* concat(char * s1, const char * s2) {
     char * result = (char *) malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
@@ -18,7 +16,7 @@ char* concat(char * s1, const char * s2) {
 FILE * load_dataset(char * filename) {
     FILE * fp;
     fp = fopen(filename, "rb");
-    // free(filename);
+    free(filename);
     return fp;
 }
 
@@ -26,13 +24,41 @@ void close_dataset(FILE * fp) {
     fclose(fp);
 }
 
-double * get_image(FILE * fp, int image_idx) {
-    int8_t * rc = (int8_t *) malloc(sizeof(int8_t) * 8);
+uint32_t get_dataset_size(FILE * fp) {
+    uint8_t * rc = (uint8_t *) malloc(sizeof(uint8_t) * 4);
+    fseek(fp, 4, SEEK_SET);
+    fread(rc, sizeof(uint8_t), 4, fp);
+    uint32_t size = ((uint32_t) rc[0] << 24) | ((uint32_t) rc[1] << 16) | ((uint32_t) rc[2] << 8) | ((uint32_t) rc[3]);
+    free(rc);
+    return size;
+}
+
+uint32_t get_image_width(FILE * fp) {
+    uint8_t * rc = (uint8_t *) malloc(sizeof(uint8_t) * 8);
     fseek(fp, 8, SEEK_SET);
-    fread(rc, sizeof(int8_t), 8, fp);
+    fread(rc, sizeof(uint8_t), 8, fp);
+    uint32_t dim2 = ((uint32_t) rc[4] << 24) | ((uint32_t) rc[5] << 16) | ((uint32_t) rc[6] << 8) | ((uint32_t) rc[7]);
+    free(rc);
+    return dim2;
+}
+
+uint32_t get_image_height(FILE * fp) {
+    uint8_t * rc = (uint8_t *) malloc(sizeof(uint8_t) * 8);
+    fseek(fp, 8, SEEK_SET);
+    fread(rc, sizeof(uint8_t), 8, fp);
+    uint32_t dim1 = ((uint32_t) rc[0] << 24) | ((uint32_t) rc[1] << 16) | ((uint32_t) rc[2] << 8) | ((uint32_t) rc[3]);
+    free(rc);
+    return dim1;
+}
+
+double * get_image(FILE * fp, int image_idx) {
+    uint8_t * rc = (uint8_t *) malloc(sizeof(uint8_t) * 8);
+    fseek(fp, 8, SEEK_SET);
+    fread(rc, sizeof(uint8_t), 8, fp);
     uint32_t dim1 = ((uint32_t) rc[0] << 24) | ((uint32_t) rc[1] << 16) | ((uint32_t) rc[2] << 8) | ((uint32_t) rc[3]);
     uint32_t dim2 = ((uint32_t) rc[4] << 24) | ((uint32_t) rc[5] << 16) | ((uint32_t) rc[6] << 8) | ((uint32_t) rc[7]);
     uint32_t size = dim1 * dim2;
+    free(rc);
 
     uint8_t pixels[size];
     fseek(fp, 16 + image_idx * size * sizeof(uint8_t), SEEK_SET);
@@ -63,7 +89,7 @@ void shuffle(int * array, int32_t n) {
     }
 }
 
-double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
+double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size, uint64_t num_classes) {
     double * true_y = (double *) malloc(sizeof(double)*num_classes*batch_size);
     for(int i = 0; i < batch_size; i++) {
         uint8_t l = get_label(labels, dataloader[idx+i]);
@@ -77,7 +103,7 @@ double * load_labels(FILE * labels, int * dataloader, int idx, int batch_size) {
     return true_y;
 }
 
-int arg_max(double * y, int idx) {
+int arg_max(double * y, int idx, uint64_t num_classes) {
     double max_val = 0.0;
     int max_idx = 0;
 

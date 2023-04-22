@@ -2,7 +2,6 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include <math.h>
 #include <curand.h>
 #include <curand_kernel.h>
 #include <cuda.h>
@@ -156,31 +155,33 @@ __global__ void batch_vector_softmax(double * input, double * output, int N, int
     }
 }
 
-// Spawn N Thread
-__global__ void vector_dsoftmax(double* input, double * output, int j, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if(i < N) {
-        double sum = 0;
-        for(int k = 0; k < N; k++)
-            sum += exp(input[k]);
-        
-        double sj = exp(input[j])/sum;
-        if(i == j)
-            output[i] = sj * (1-sj);
-        else
-            output[i] = -sj*(exp(input[i])/sum);
-    }
-}
+// Not used
 
-// Spawn B Threads
-__global__ void batch_vector_dsoftmax(double * input, double * output, int * js, int N, int B) {
-    int batch = blockIdx.x * blockDim.x + threadIdx.x;
-    if(batch < B) {
-        dim3 gridSz(1, 1, 1);
-        dim3 blockSz(N, 1, 1);
-        vector_dsoftmax<<<gridSz, blockSz>>>(input + (batch * N), output + (batch * N), js[batch], N);
-    }
-}
+// // Spawn N Thread
+// __global__ void vector_dsoftmax(double* input, double * output, int j, int N) {
+//     int i = blockIdx.x * blockDim.x + threadIdx.x;
+//     if(i < N) {
+//         double sum = 0;
+//         for(int k = 0; k < N; k++)
+//             sum += exp(input[k]);
+        
+//         double sj = exp(input[j])/sum;
+//         if(i == j)
+//             output[i] = sj * (1-sj);
+//         else
+//             output[i] = -sj*(exp(input[i])/sum);
+//     }
+// }
+
+// // Spawn B Threads
+// __global__ void batch_vector_dsoftmax(double * input, double * output, int * js, int N, int B) {
+//     int batch = blockIdx.x * blockDim.x + threadIdx.x;
+//     if(batch < B) {
+//         dim3 gridSz(1, 1, 1);
+//         dim3 blockSz(N, 1, 1);
+//         vector_dsoftmax<<<gridSz, blockSz>>>(input + (batch * N), output + (batch * N), js[batch], N);
+//     }
+// }
 
 // Spawn N Threads
 __global__ void vector_add(double * a, double * b, double * output, int N) {
@@ -304,5 +305,18 @@ __global__ void mse_loss(double * a, double * b, double * output, int N, int B) 
         }
 
         output[batch] = sum / N;
+    }
+}
+
+// Spawn B Threads
+__global__ void cross_entropy_loss(double * a, double * b, double * output, int N, int B) {
+    int batch = threadIdx.x + blockIdx.x * blockDim.x;
+    if(batch < B) {
+        double sum = 0;
+        for(int i = 0; i < N; i++) {
+            sum -= b[batch * N + i] * log(a[batch * N + i]);
+        }
+
+        output[batch] = sum;
     }
 }

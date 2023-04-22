@@ -33,9 +33,12 @@ Notes:
 - How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
 - CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
 
-- The format.arch file has an example that 
+- For reference, the format.arch file has an example that gets 98% test accuracy after 2 minutes of training
+- For large networks, doing ReLU w/ a softmax causes exploding gradients
+    - Might need to add gradient clipping since we already have good weight initialization and softmax max normalization
 
-Things to Add:
+
+Features to Add:
 - More Optimizers like Adam
 - Convolutional Layers
 - Normalization Layers

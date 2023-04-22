@@ -9,6 +9,8 @@
 
 #define THREADS (32)
 
+// This file specifies all the ML logic and moves from host to device memory before calling kernels 
+
 typedef struct DatasetInfo {
   char * train_files;
   char * test_files;
@@ -16,6 +18,7 @@ typedef struct DatasetInfo {
   uint64_t epochs;
   uint64_t batch_size;
   double alpha;
+  double epsilon;
   char * loss_func;
 } DatasetInfo;
 
@@ -30,6 +33,7 @@ typedef struct Model {
     double ** biases; // list of 1D bias vectors for each layer
     ArchInfo * arch_info; // architecture info
 } Model;
+
 
 Model * initialize_model(ArchInfo * arch_info) {
     Model * model = (Model *) malloc(sizeof(Model));
@@ -52,9 +56,9 @@ Model * initialize_model(ArchInfo * arch_info) {
         setup_kernel<<<gridSz,blockSz>>>(state, time(NULL));
 
         if(strcmp(act_func, "ReLU") == 0)
-            he_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
+            normal_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(2.0/n), (int) n*m); // values sampled from G(0.0, sqrt(2/n))
         else
-            xavier_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
+            normal_init<<<gridSz, blockSz>>>(model->weights[i], state, sqrt(6.0/(n+m)), (int) n*m); // values sampled from U(-sqrt(6/(n+m)), sqrt(6/(n+m)))
 
         cudaFree(state);
     }
@@ -68,7 +72,11 @@ Model * initialize_model(ArchInfo * arch_info) {
         dim3 blockSz(THREADS, 1, 1);
 
         // gpu initialize model->biases[i] in parallel
-        zero_init<<<gridSz, blockSz>>>(model->biases[i], m);
+        char * act_func = arch_info->activation_function[i+1];
+        if(strcmp(act_func, "ReLU") == 0)
+            constant_init<<<gridSz, blockSz>>>(model->biases[i], m, 0.001);
+        else
+            constant_init<<<gridSz, blockSz>>>(model->biases[i], m, 0.0);
     }
 
     model->arch_info = arch_info;
@@ -155,6 +163,7 @@ Model * load_model(char * checkpoint_path, ArchInfo * arch_info) {
     return model;
 }
 
+// forward propagation of model
 double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int batch_size) {
     double ** weights = model->weights;
     double ** biases = model->biases;
@@ -203,7 +212,8 @@ double ** forward(Model * model, FILE * dataset, int * dataloader, int idx, int 
     return layer_vecs;
 }
 
-double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char * loss_func, int batch_size, double alpha) {
+// backpropagation of model
+double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char * loss_func, int batch_size, double alpha, double epsilon) {
     double ** weights = model->weights;
     double ** biases = model->biases;
     ArchInfo * arch_info = model->arch_info;
@@ -303,14 +313,14 @@ double backward(double ** layer_vecs, double * true_y_cpu, Model * model, char *
         cudaMalloc(&gradients, sizeof(double) * layers_size[i+1] * layers_size[i]);
         dim3 gridSz1((layers_size[i+1] * layers_size[i] + THREADS - 1)/THREADS, 1, 1);
         dim3 blockSz1(THREADS, 1, 1);
-        zero_init<<<gridSz1, blockSz1>>>(gradients, layers_size[i+1] * layers_size[i]);
+        constant_init<<<gridSz1, blockSz1>>>(gradients, layers_size[i+1] * layers_size[i], 0.0);
 
         dim3 gridSz2((layers_size[i+1] + THREADS - 1)/THREADS, (layers_size[i] + THREADS - 1)/THREADS, 1);
         dim3 blockSz2(THREADS, THREADS);
         vector_op<<<gridSz2, blockSz2>>>(layer_delts[i], layer_vecs[i], gradients, layers_size[i+1], layers_size[i], batch_size);
-        matrix_sub_scalar<<<gridSz2, blockSz2>>>(weights[i], gradients, alpha, weights[i], layers_size[i+1], layers_size[i]);
+        matrix_sub_scalar<<<gridSz2, blockSz2>>>(weights[i], gradients, alpha, epsilon, weights[i], layers_size[i+1], layers_size[i]);
 
-        vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], alpha, biases[i], layers_size[i+1]);
+        vector_sub_scalar<<<1, layers_size[i+1]>>>(biases[i], layer_delts[i], alpha, epsilon, biases[i], layers_size[i+1]);
 
         cudaFree(gradients);
     }
@@ -366,7 +376,7 @@ Model * train(DatasetInfo * dataset_info, ArchInfo * arch_info) {
         for(int idx = 0; idx < num_images; idx+=dataset_info->batch_size) {
             double ** layer_vecs = forward(model, dataset, dataloader, idx, dataset_info->batch_size);
             double * true_y = load_labels(labels, dataloader, idx, dataset_info->batch_size, num_classes);
-            double loss = backward(layer_vecs, true_y, model, dataset_info->loss_func, dataset_info->batch_size, dataset_info->alpha);
+            double loss = backward(layer_vecs, true_y, model, dataset_info->loss_func, dataset_info->batch_size, dataset_info->alpha, dataset_info->epsilon);
 
             running_loss+=loss;
             if(loss < 0.0) // negative loss is not possible, must have been an error inside backward

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// This file are helper and I/O methods for dealing with the MNIST dataset format
 
 char* concat(char * s1, const char * s2) {
     char * result = (char *) malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator

@@ -6,6 +6,7 @@
 #include <curand_kernel.h>
 #include <cuda.h>
 
+// This file contains all of our CUDA kernel functions
 
 // Spawn N Threads
 __global__ void matrix_mul(double * a, double * b, double * output, int N, int M) {
@@ -134,54 +135,24 @@ __global__ void batch_vector_dtanh(double * input, double * output, int N, int B
     }
 }
 
-// Spawn N Threads
-__global__ void vector_softmax(double * input, double * output, int N) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if(i < N) {
-        double sum = 0;
-        for(int k = 0; k < N; k++)
-            sum += exp(input[k]);
-        output[i] = exp(input[i])/sum;
-    }
-}
-
 // Spawn B Threads
 __global__ void batch_vector_softmax(double * input, double * output, int N, int B) {
     int batch = blockIdx.x * blockDim.x + threadIdx.x;
     if(batch < B) {
-        dim3 gridSz(1, 1, 1);
-        dim3 blockSz(N, 1, 1);
-        vector_softmax<<<gridSz, blockSz>>>(input + (batch * N), output + (batch * N), N);
+        double maxv = input[batch*N];
+        for(int i = 0; i < N; i++) {
+            if(input[batch*N + i] > maxv)
+                maxv = input[batch*N + i];
+        }
+
+        double sum = 0.0;
+        for(int i = 0; i < N; i++)
+            sum += exp(input[batch*N + i] - maxv);
+
+        for(int i = 0; i < N; i++)
+            output[batch*N + i] = exp(input[batch*N + i] - maxv)/sum;
     }
 }
-
-// Not used
-
-// // Spawn N Thread
-// __global__ void vector_dsoftmax(double* input, double * output, int j, int N) {
-//     int i = blockIdx.x * blockDim.x + threadIdx.x;
-//     if(i < N) {
-//         double sum = 0;
-//         for(int k = 0; k < N; k++)
-//             sum += exp(input[k]);
-        
-//         double sj = exp(input[j])/sum;
-//         if(i == j)
-//             output[i] = sj * (1-sj);
-//         else
-//             output[i] = -sj*(exp(input[i])/sum);
-//     }
-// }
-
-// // Spawn B Threads
-// __global__ void batch_vector_dsoftmax(double * input, double * output, int * js, int N, int B) {
-//     int batch = blockIdx.x * blockDim.x + threadIdx.x;
-//     if(batch < B) {
-//         dim3 gridSz(1, 1, 1);
-//         dim3 blockSz(N, 1, 1);
-//         vector_dsoftmax<<<gridSz, blockSz>>>(input + (batch * N), output + (batch * N), js[batch], N);
-//     }
-// }
 
 // Spawn N Threads
 __global__ void vector_add(double * a, double * b, double * output, int N) {
@@ -232,28 +203,28 @@ __global__ void matrix_scalar(double * input, double sc, double * output, int N,
 }
 
 // Spawn N Threads
-__global__ void he_init(double * output, curandState * globalState, double range, int N) {
+__global__ void uniform_init(double * output, curandState * globalState, double range, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
         curandState localState = globalState[i];
-        output[i] = curand_normal(&localState) * range;
+        output[i] = curand_uniform_double(&localState) * 2 * range - range;
     }
 }
 
 // Spawn N Threads
-__global__ void xavier_init(double * output, curandState * globalState, double range, int N) {
+__global__ void normal_init(double * output, curandState * globalState, double range, int N) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
         curandState localState = globalState[i];
-        output[i] = curand_uniform(&localState) * 2*range - range;
+        output[i] = curand_normal_double(&localState) * range;
     }
 }
 
 // Spawn N Threads
-__global__ void zero_init(double * output, int N) {
+__global__ void constant_init(double * output, int N, double sc) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if(i < N) {
-        output[i] = 0.0;
+        output[i] = sc;
     }
 }
 
@@ -270,18 +241,18 @@ __global__ void vector_hadamard(double * a, double * b, double * output, int N) 
 }
 
 // Spawn N x M Threads
-__global__ void matrix_sub_scalar(double * a, double * b, double sc, double * output, int N, int M) {
+__global__ void matrix_sub_scalar(double * a, double * b, double alpha, double epsilon, double * output, int N, int M) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
     int col = blockIdx.y * blockDim.y + threadIdx.y;
     if(row < N && col < M)
-        output[row * M + col] = a[row * M + col] - sc * b[row * M + col];
+        output[row * M + col] = ((1 - alpha * epsilon) * a[row * M + col]) - (alpha * b[row * M + col]);
 }
 
 // Spawn N Threads
-__global__ void vector_sub_scalar(double * a, double * b, double sc, double * output, int N) {
+__global__ void vector_sub_scalar(double * a, double * b, double alpha, double epsilon, double * output, int N) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     if(i < N)
-        output[i] = a[i] - sc * b[i];
+        output[i] = ((1 - alpha * epsilon) * a[i]) - (alpha * b[i]);
 }
 
 // Spawn N x M Threads

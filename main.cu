@@ -11,9 +11,10 @@
 
 #include "model.h"
 
+// This file is the interpreter for our language
+
 char *program;
 char *current;
-
 
 void skip() {
     while (isspace(*current)) current += 1;
@@ -199,6 +200,9 @@ int main(int argc, char **argv) {
 
     consume_or_fail("Alpha: ");
     dataset_info->alpha = consume_double();
+
+    consume_or_fail("Epsilon: ");
+    dataset_info->epsilon = consume_double();
 
     consume_or_fail("Loss: ");
     dataset_info->loss_func = consume_identifier();

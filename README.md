@@ -1,5 +1,5 @@
 # CUDA-ML
-Implementing an ML language in CUDA
+Implementing an ML language in CUDA.
 
 - Specify an ML language for feed forward NNs in a .arch file
 - Create a C interpreter that can run the program in CUDA on a GPU / Use Cuda to interpret the .arch file and execute it on a GPU
@@ -10,7 +10,7 @@ Implementing an ML language in CUDA
         - Test:
             - Inputs: .arch file, test dataset (input data files (.in))
             - Outputs: output data file (.out)
-- .arch format:
+- .arch format (must adhere to this format, otherwise undefined behavior):
     - Input layer size -> hidden layer size (hidden layer activation) -> … -> output layer size (output layer activation)
         - Activations: ReLU, sigmoid, tanh, softmax
     - Path to train dataset (Train: path)
@@ -19,14 +19,27 @@ Implementing an ML language in CUDA
     - Number of training epochs (Epochs: #)
     - Batch size (Batch Size: #)
     - Learning Rate (Alpha: double)
+    - L2 Regularization Parameter (Epsilon: double)
+        - 0 means no regularization
     - Loss function (Loss: name)
         - Losses: MSE, CrossEntropy
 
 
 Notes:
 - Softmax can only be used as the final layer and only with CrossEntropy loss (not MSE!)
-- Optimizer thats always used is Mini-Batch Gradient Descent
+- Optimizer is currently Mini-Batch Gradient Descent
 
 - How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
 - How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
 - CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
+
+- The format.arch file has an example that 
+
+Things to Add:
+- More Optimizers like Adam
+- Convolutional Layers
+- Normalization Layers
+- Pooling Layers
+- Dropout
+- More Loss Functions
+- More Activation Functions

@@ -1,5 +1,5 @@
 # CUDA-ML
-Implementing an ML language in CUDA. Inherently a basic version of PyTorch. Current task is for MNIST handwritten images but modifying utils.h to the format of another dataset would make it work for that.
+Implementing an ML language in CUDA. Inherently a basic version of PyTorch. Current task is for MNIST handwritten digits but modifying utils.h to the format of another dataset would make it work for that.
 
 - Specify an ML language for feed forward NNs in a .arch file
 - Create a C interpreter that can run the program in CUDA on a GPU / Use Cuda to interpret the .arch file and execute it on a GPU

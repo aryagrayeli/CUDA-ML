@@ -1,15 +1,9 @@
 # CUDA-ML
-Implementing an ML language in CUDA.
+Implementing an ML language in CUDA. Inherently a basic version of PyTorch. Current task is for MNIST handwritten images but modifying utils.h to the format of another dataset would make it work for that.
 
 - Specify an ML language for feed forward NNs in a .arch file
 - Create a C interpreter that can run the program in CUDA on a GPU / Use Cuda to interpret the .arch file and execute it on a GPU
-    - Both train script and test script (different inputs to each)
-        - Train: 
-            - Inputs: .arch file, folder of train dataset (each entry is folder w/ inputs (.in) and outputs (.out) )
-            - Outputs: .pth file w/ model weights + print out loss
-        - Test:
-            - Inputs: .arch file, test dataset (input data files (.in))
-            - Outputs: output data file (.out)
+
 - .arch format (must adhere to this format, otherwise undefined behavior):
     - Input layer size -> hidden layer size (hidden layer activation) -> … -> output layer size (output layer activation)
         - Activations: ReLU, sigmoid, tanh, softmax
@@ -32,7 +26,7 @@ Notes:
 - How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
 - How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
 - CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
-- Dataset from: http://yann.lecun.com/exdb/mnist/
+- MNIST Dataset from: http://yann.lecun.com/exdb/mnist/
 
 - For reference, the format.arch file has an example that gets 98% test accuracy after 2 minutes of training
 - For large networks, doing ReLU w/ a softmax causes exploding gradients

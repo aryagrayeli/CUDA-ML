@@ -24,7 +24,8 @@ Notes:
 - Optimizer is currently Mini-Batch Gradient Descent
 
 - How to compile: nvcc -rdc=true -lcudadevrt main.cu -o run.exe
-- How to run: CUDA_VISIBLE_DEVICES=4 ./run.exe format.arch
+- How to run: CUDA_VISIBLE_DEVICES=0 ./run.exe format.arch
+    - The CUDA_VISIBLE_DEVICES isn't necessary, just for specifying which GPU number to run on
 - CUDA Guide: https://www.cs.utexas.edu/~rossbach/cs378h/papers/cuda-programming.pdf
 - MNIST Dataset from: http://yann.lecun.com/exdb/mnist/
 
